@@ -1,0 +1,16 @@
+{
+  "name": "cosense-to-clipstudio",
+  "version": "0.1.0",
+  "description": "Cosense で書いた漫画プロットを CLIP STUDIO PAINT EX のストーリーエディターへ貼り付けやすい形式に変換する Cosense UserScript",
+  "repository": "github:fsubal/cosense-to-clipstudio",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test",
+    "build": "esbuild src/index.js --bundle --format=iife --outfile=dist/script.js"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "esbuild": "^0.25.0"
+  }
+}
