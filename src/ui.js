@@ -106,7 +106,7 @@ export function openModal(result) {
 
     const header = el("div", "ctcs-header");
     const title = el("h2");
-    title.textContent = "CSPへ書き出す";
+    title.textContent = "CLIPSTUDIO用に出力";
     const closeButton = el("button", "ctcs-close");
     closeButton.textContent = "×";
     closeButton.addEventListener("click", close);

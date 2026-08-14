@@ -189,7 +189,7 @@
       modal.replaceChildren();
       const header = el("div", "ctcs-header");
       const title = el("h2");
-      title.textContent = "CSP\u3078\u66F8\u304D\u51FA\u3059";
+      title.textContent = "CLIPSTUDIO\u7528\u306B\u51FA\u529B";
       const closeButton = el("button", "ctcs-close");
       closeButton.textContent = "\xD7";
       closeButton.addEventListener("click", close);
@@ -307,7 +307,7 @@
   function main() {
     const cosense = getCosense();
     cosense.PageMenu.addMenu({
-      title: "CSP\u3078\u66F8\u304D\u51FA\u3059",
+      title: "CLIPSTUDIO\u7528\u306B\u51FA\u529B",
       image: ICON,
       onClick: () => {
         if (cosense.Layout !== "page") {

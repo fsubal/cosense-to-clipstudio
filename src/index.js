@@ -11,7 +11,7 @@ const ICON =
 function main() {
   const cosense = getCosense();
   cosense.PageMenu.addMenu({
-    title: "CSPへ書き出す",
+    title: "CLIPSTUDIO用に出力",
     image: ICON,
     onClick: () => {
       if (cosense.Layout !== "page") {
