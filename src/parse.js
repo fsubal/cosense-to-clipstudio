@@ -9,6 +9,9 @@ const PAGE_HEADING_PATTERN = /^(\d+)\.(?:\s+(.*))?$/;
 /** `[fsubal.icon]` のようなプロフィールアイコンから始まる行は作者コメント */
 const AUTHOR_COMMENT_PATTERN = /^\[[^[\]]+\.icon\]/;
 
+/** `[- 取り消し線]` の記法（`[-* ...]` などの複合装飾も含む）は無かったものとして扱う */
+const STRIKETHROUGH_PATTERN = /\[-[^\]]*\]/g;
+
 /** @type {{ kind: import("./types.js").TextKind, pattern: RegExp }[]} */
 const KIND_PATTERNS = [
   { kind: "dialogue", pattern: /^「([\s\S]*)」$/ },
@@ -34,7 +37,7 @@ export function parsePlot(lines) {
 
   lines.forEach((line, index) => {
     const sourceLine = line.sourceLine ?? index;
-    const text = line.text.trim();
+    const text = line.text.replace(STRIKETHROUGH_PATTERN, "").trim();
     if (text === "") {
       return;
     }

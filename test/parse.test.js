@@ -126,6 +126,28 @@ test("誰のアイコンでも作者コメントとして除外される", () =>
   assert.deepEqual(pages[0].items, []);
 });
 
+test("行全体が取り消し線の行は出力されない", () => {
+  const { pages, warnings } = parsePlot([
+    { text: "[- 「ボツにしたセリフ」]", indent: 1 },
+    { text: "1.", indent: 0 },
+    { text: "[- ［ボツにしたナレーション］]", indent: 1 },
+  ]);
+  assert.deepEqual(pages[0].items, []);
+  // 取り消し済みの行は見出し前にあっても警告しない
+  assert.deepEqual(warnings, []);
+});
+
+test("行の一部の取り消し線は除去して出力される", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "「セリフ[- を書き直す前の部分]はこう入れる」", indent: 1 },
+  ]);
+  assert.deepEqual(
+    pages[0].items.map(({ kind, text }) => ({ kind, text })),
+    [{ kind: "dialogue", text: "セリフはこう入れる" }],
+  );
+});
+
 test("空行は無視される", () => {
   const { pages, warnings } = parsePlot([
     { text: "", indent: 0 },

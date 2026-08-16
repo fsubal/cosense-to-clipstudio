@@ -29,6 +29,7 @@
   // src/parse.js
   var PAGE_HEADING_PATTERN = /^(\d+)\.(?:\s+(.*))?$/;
   var AUTHOR_COMMENT_PATTERN = /^\[[^[\]]+\.icon\]/;
+  var STRIKETHROUGH_PATTERN = /\[-[^\]]*\]/g;
   var KIND_PATTERNS = [
     { kind: "dialogue", pattern: /^「([\s\S]*)」$/ },
     { kind: "narration", pattern: /^［([\s\S]*)］$/ },
@@ -42,7 +43,7 @@
     let expectedNumber = 1;
     lines.forEach((line, index) => {
       const sourceLine = line.sourceLine ?? index;
-      const text = line.text.trim();
+      const text = line.text.replace(STRIKETHROUGH_PATTERN, "").trim();
       if (text === "") {
         return;
       }
