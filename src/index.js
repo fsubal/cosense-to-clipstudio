@@ -1,4 +1,4 @@
-import { getCosense, toPlotLines } from "./cosense.js";
+import { CosensePage } from "./cosense.js";
 import { parsePlot } from "./parse.js";
 import { openModal } from "./ui.js";
 
@@ -9,19 +9,24 @@ const ICON =
   );
 
 function main() {
-  const cosense = getCosense();
-  cosense.PageMenu.addMenu({
-    title: "CLIPSTUDIO用に出力",
-    image: ICON,
-    onClick: () => {
-      if (cosense.Layout !== "page") {
+  const cosensePage = new CosensePage();
+  cosensePage.addMenu(
+    "CLIPSTUDIO用に出力",
+    ICON,
+    () => {
+      if (!cosensePage.isInPageView) {
         alert("ページを開いた状態で実行してください");
         return;
       }
-      const result = parsePlot(toPlotLines(cosense.Page.lines));
-      openModal(result);
+      const result = parsePlot(cosensePage.toPlotLines());
+      openModal(result, {
+        source: {
+          title: cosensePage.lines[0]?.text,
+          url: window.location.href,
+        },
+      });
     },
-  });
+  );
 }
 
 main();

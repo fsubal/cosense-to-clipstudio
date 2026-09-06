@@ -53,7 +53,7 @@ UserScript は自分にだけ有効です。プロジェクトの他のメンバ
 ## 使い方
 
 1. プロットを書いた Cosense ページを開く
-2. ページ右上の Page Menu に追加された「CSPへ書き出す」（CSP アイコン）をクリック
+2. ページ右上の Page Menu に追加された「CLIPSTUDIO用に出力」（CSP アイコン）をクリック
 3. モーダルにページごとの抽出結果（種別バッジ・警告つき）が表示される
    - モノローグは丸ゴシック風フォント + 紫色でプレビューされます
    - 前ページ／次ページボタンでページを移動できます
@@ -103,7 +103,7 @@ npm run build   # src/ を dist/script.js にバンドル (esbuild)
 
 1. [インストール](#インストール) の手順で `dist/script.js` を自分のページに貼り付け、リロードする
 2. Cosense に新しいページを作り、[プロットの書き方](#プロットの書き方) の入力例をそのまま書く
-3. Page Menu に「CSPへ書き出す」ボタンが表示されることを確認する
+3. Page Menu に「CLIPSTUDIO用に出力」ボタンが表示されることを確認する
 4. クリックしてモーダルが開き、以下になることを確認する
    - 1ページ目: セリフ／ナレーション／モノローグの3項目
    - 2ページ目: 抽出項目0件
@@ -132,3 +132,90 @@ npm run build   # src/ を dist/script.js にバンドル (esbuild)
   （失敗時は `document.execCommand("copy")` にフォールバックする実装あり）
 - CLIP STUDIO PAINT EX ストーリーエディターが空行区切りテキストを
   複数項目として取り込む挙動
+
+## Computer Use連携（Mac版CSPは未検証）
+
+Cosenseの現在のプロットページを1作品として、全ページの中間表現（manifest）をJSONで出力します。
+Mac版CSPの起動・作品作成・テキスト投入を行う機能ではありません。
+
+1. 再ビルド済みの `dist/script.js` をプロフィールのUserScriptに貼り替え、リロードします。
+2. プロットページの「CLIPSTUDIO用に出力」を開きます。
+3. 「Computer Use用JSONをコピー」で作品全体のJSONをコピーします。
+   ファイルが必要なら「Computer Use用JSONを書き出す」で
+   `cosense-to-clipstudio.manifest.json` を保存します。
+4. Astra / Computer Useの会話にJSONを貼り付けるかファイルを添付し、
+   「このmanifestのページ構成と警告を確認して」のように指示します。
+
+従来の「このページをコピー」は引き続き空行区切りの本文だけをコピーします。
+JSONボタンは表示中のページにかかわらず全ページを出力し、抽出ページが0件でも利用できます。
+コピー失敗時には書き出しボタンを利用してください。開いた時点のスナップショットなので、
+プロットを編集した場合はモーダルを開き直してください。
+
+### manifest例
+
+```json
+{
+  "schema": "cosense-to-clipstudio/manifest",
+  "version": 1,
+  "source": {
+    "title": "第7話",
+    "url": "https://scrapbox.io/example/第7話"
+  },
+  "pageCount": 2,
+  "pages": [
+    {
+      "number": 1,
+      "label": "通勤のシーン",
+      "items": [
+        { "kind": "dialogue", "text": "おはよう", "sourceLine": 2 },
+        { "kind": "narration", "text": "翌朝", "sourceLine": 3 },
+        { "kind": "monologue", "text": "眠い", "sourceLine": 4 }
+      ],
+      "warnings": []
+    },
+    { "number": 2, "label": "", "items": [], "warnings": [] }
+  ],
+  "warnings": []
+}
+```
+
+- `schema` は形式の識別子、`version` は整数の形式バージョン（現在は1）です。
+- `source.title` はCosenseのタイトル行、`source.url` は実行時のページURLです。
+  取得できないフィールドは省略し、情報がない場合も `source: {}` を出力します。
+- `pageCount` は抽出したページの個数です。最大ページ番号ではありません。
+  ページ番号の重複・欠落・逆順や空ページは補正せず、入力順に保持します。
+- `sourceLine` は元のCosenseページの行番号で、タイトル行を0とします。
+- 各ページの `warnings` とトップレベルの `warnings`（ページに属さない警告）は
+  パーサーの結果をそのまま保持します。自動操作前に両方を確認してください。
+- `kind` は `dialogue` / `narration` / `monologue` を保持します。
+  フォントなどCSP固有の設定への割り当ては、将来の利用側で決めます。
+
+### 任意の作品設定（開発者向け）
+
+`src/format.js` の純粋関数 `createManifest(result, options)` はオブジェクトを、
+`formatManifest(result, options)` は整形済みJSON文字列を返します。
+`openModal(result, options)` にも同じオプションを渡せます。
+
+```js
+const json = formatManifest(result, {
+  source: { title: "第7話", url: "https://scrapbox.io/example/第7話" },
+  documentSettings: {
+    title: "episode-007",
+    pageCount: 18,
+    presetName: "商業原稿"
+  }
+});
+```
+
+指定した場合のみトップレベルに `documentSettings` が追加されます。
+`title`（作品名）、`pageCount`（作成したいページ数）、`presetName` は任意です。
+抽出数の `pageCount` とは独立し、設定の補完・検証・CSPへの適用は行いません。
+現時点のUIには設定入力欄を設けていません。将来、用紙サイズや解像度などの
+オプションをこの設定オブジェクトへ追加できる設計です。
+
+### 確認範囲
+
+単体テストは種別・元行番号・警告・空ページ・番号の保持、JSONの往復、
+任意設定と既存のページ単位テキスト出力を確認します。
+実際のCosense上での新ボタンの操作・ダウンロード・Universal Clipboard、
+およびMac版CSPへの投入は未検証です。

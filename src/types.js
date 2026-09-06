@@ -37,3 +37,28 @@
  */
 
 export {};
+
+/**
+ * 将来のCSP作品作成に渡す任意の設定。出力時には適用・補完しない。
+ * @typedef {object} DocumentSettings
+ * @property {string} [title] 作品名
+ * @property {number} [pageCount] 作成したいページ数（抽出ページ数とは独立）
+ * @property {string} [presetName] CSPで選択するプリセット名
+ */
+
+/**
+ * @typedef {object} ManifestOptions
+ * @property {{title?: string, url?: string}} [source]
+ * @property {DocumentSettings} [documentSettings]
+ */
+
+/**
+ * @typedef {object} ComputerUseManifest
+ * @property {string} schema
+ * @property {number} version
+ * @property {{title?: string, url?: string}} source
+ * @property {number} pageCount 抽出したページの個数。最大ページ番号ではない
+ * @property {PlotPage[]} pages
+ * @property {string[]} warnings 特定のページに紐づかない警告
+ * @property {DocumentSettings} [documentSettings]
+ */

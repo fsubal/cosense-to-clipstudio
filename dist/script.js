@@ -15,6 +15,35 @@
     }
     return cosense;
   }
+  var CosensePage = class {
+    /**
+     * UserScript API のグローバルオブジェクトを返す。
+     * 2024年以降 window.cosense と window.scrapbox の両方に生えている
+     *
+     * @returns {any}
+     */
+    #cosense = getCosense();
+    get isInPageView() {
+      return this.#cosense.Layout === "page";
+    }
+    /**
+     * @returns {{ text: string }[]}
+     */
+    get lines() {
+      return this.#cosense.Page.lines;
+    }
+    /**
+     * @param {string} title 
+     * @param {string} image 
+     * @param {() => void} onClick 
+     */
+    addMenu(title, image, onClick) {
+      this.#cosense.PageMenu.addMenu({ title, image, onClick });
+    }
+    toPlotLines() {
+      return toPlotLines(this.lines);
+    }
+  };
   function toPlotLines(rawLines) {
     return rawLines.slice(1).map((line, index) => {
       const indent = (line.text.match(INDENT_PATTERN) ?? [""])[0].length;
@@ -99,6 +128,27 @@
   function formatPage(page) {
     return page.items.map((item) => item.text).join("\n\n");
   }
+  function createManifest(result, options = {}) {
+    return {
+      schema: "cosense-to-clipstudio/manifest",
+      version: 1,
+      source: { ...options.source },
+      pageCount: result.pages.length,
+      pages: result.pages.map((page) => ({
+        number: page.number,
+        label: page.label,
+        items: page.items.map(({ kind, text, sourceLine }) => ({ kind, text, sourceLine })),
+        warnings: [...page.warnings]
+      })),
+      warnings: [...result.warnings],
+      ...options.documentSettings === void 0 ? {} : {
+        documentSettings: { ...options.documentSettings }
+      }
+    };
+  }
+  function formatManifest(result, options = {}) {
+    return JSON.stringify(createManifest(result, options), null, 2);
+  }
 
   // src/ui.js
   var KIND_LABELS = {
@@ -158,6 +208,7 @@
 }
 .ctcs-empty { color: #888; }
 .ctcs-footer {
+  flex-wrap: wrap;
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px; padding: 12px 16px; border-top: 1px solid #ddd;
 }
@@ -169,8 +220,9 @@
 .ctcs-copy { border-color: #1976d2 !important; background: #1976d2 !important; color: #fff; }
 .ctcs-position { color: #666; font-size: 12px; }
 `;
-  function openModal(result) {
+  function openModal(result, options = {}) {
     injectStyle();
+    const manifestJSON = formatManifest(result, options);
     let index = 0;
     const overlay = el("div", "ctcs-overlay");
     const modal = el("div", "ctcs-modal");
@@ -196,6 +248,27 @@
       closeButton.addEventListener("click", close);
       header.append(title, closeButton);
       modal.appendChild(header);
+      const exportBar = el("div", "ctcs-footer");
+      const copyJSON = el("button");
+      copyJSON.textContent = "Computer Use\u7528JSON\u3092\u30B3\u30D4\u30FC";
+      const status = el("span", "ctcs-position");
+      status.setAttribute("role", "status");
+      copyJSON.addEventListener("click", async () => {
+        const ok = await copyText(manifestJSON);
+        status.textContent = ok ? "\u4F5C\u54C1\u5168\u4F53\u306EJSON\u3092\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F \u2713" : "\u30B3\u30D4\u30FC\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002JSON\u3092\u66F8\u304D\u51FA\u3057\u3066\u5229\u7528\u3057\u3066\u304F\u3060\u3055\u3044";
+      });
+      const downloadJSON = el("button");
+      downloadJSON.textContent = "Computer Use\u7528JSON\u3092\u66F8\u304D\u51FA\u3059";
+      downloadJSON.addEventListener("click", () => {
+        try {
+          downloadManifest(manifestJSON);
+          status.textContent = "\u4F5C\u54C1\u5168\u4F53\u306EJSON\u306E\u66F8\u304D\u51FA\u3057\u3092\u958B\u59CB\u3057\u307E\u3057\u305F";
+        } catch {
+          status.textContent = "\u66F8\u304D\u51FA\u3057\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002JSON\u30B3\u30D4\u30FC\u3092\u304A\u8A66\u3057\u304F\u3060\u3055\u3044";
+        }
+      });
+      exportBar.append(copyJSON, downloadJSON, status);
+      modal.appendChild(exportBar);
       const body = el("div", "ctcs-body");
       modal.appendChild(body);
       if (result.pages.length === 0) {
@@ -273,9 +346,13 @@
       textarea.style.opacity = "0";
       document.body.appendChild(textarea);
       textarea.select();
-      const ok = document.execCommand("copy");
-      textarea.remove();
-      return ok;
+      try {
+        return document.execCommand("copy");
+      } catch {
+        return false;
+      } finally {
+        textarea.remove();
+      }
     }
   }
   function appendWarnings(parent, warnings) {
@@ -300,25 +377,44 @@
     style.textContent = CSS;
     document.head.appendChild(style);
   }
+  function downloadManifest(json) {
+    const blob = new Blob([json], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = el("a");
+    link.href = url;
+    link.download = "cosense-to-clipstudio.manifest.json";
+    document.body.appendChild(link);
+    try {
+      link.click();
+    } finally {
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1e3);
+    }
+  }
 
   // src/index.js
   var ICON = "data:image/svg+xml," + encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#37474f"/><text x="16" y="21" font-family="sans-serif" font-size="11" font-weight="bold" fill="#fff" text-anchor="middle">CSP</text></svg>`
   );
   function main() {
-    const cosense = getCosense();
-    cosense.PageMenu.addMenu({
-      title: "CLIPSTUDIO\u7528\u306B\u51FA\u529B",
-      image: ICON,
-      onClick: () => {
-        if (cosense.Layout !== "page") {
+    const cosensePage = new CosensePage();
+    cosensePage.addMenu(
+      "CLIPSTUDIO\u7528\u306B\u51FA\u529B",
+      ICON,
+      () => {
+        if (!cosensePage.isInPageView) {
           alert("\u30DA\u30FC\u30B8\u3092\u958B\u3044\u305F\u72B6\u614B\u3067\u5B9F\u884C\u3057\u3066\u304F\u3060\u3055\u3044");
           return;
         }
-        const result = parsePlot(toPlotLines(cosense.Page.lines));
-        openModal(result);
+        const result = parsePlot(cosensePage.toPlotLines());
+        openModal(result, {
+          source: {
+            title: cosensePage.lines[0]?.text,
+            url: window.location.href
+          }
+        });
       }
-    });
+    );
   }
   main();
 })();

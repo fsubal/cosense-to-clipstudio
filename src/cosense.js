@@ -10,13 +10,7 @@
  */
 const INDENT_PATTERN = /^[ \t　]*/;
 
-/**
- * UserScript API のグローバルオブジェクトを返す。
- * 2024年以降 window.cosense と window.scrapbox の両方に生えている
- *
- * @returns {any}
- */
-export function getCosense() {
+function getCosense() {
   const cosense =
     /** @type {any} */ (globalThis).cosense ??
     /** @type {any} */ (globalThis).scrapbox;
@@ -26,6 +20,43 @@ export function getCosense() {
     );
   }
   return cosense;
+}
+
+/**
+ * window.cosense が any なので、外部に any が漏れ出さないようにするためのクラス
+ */
+export class CosensePage {
+  /**
+   * UserScript API のグローバルオブジェクトを返す。
+   * 2024年以降 window.cosense と window.scrapbox の両方に生えている
+   *
+   * @returns {any}
+   */
+  #cosense = getCosense();
+
+  get isInPageView() {
+    return this.#cosense.Layout === "page";
+  }
+
+  /**
+   * @returns {{ text: string }[]}
+   */
+  get lines() {
+    return this.#cosense.Page.lines;
+  }
+
+  /**
+   * @param {string} title 
+   * @param {string} image 
+   * @param {() => void} onClick 
+   */
+  addMenu(title, image, onClick) {
+    this.#cosense.PageMenu.addMenu({ title, image, onClick });
+  }
+
+  toPlotLines() {
+    return toPlotLines(this.lines);
+  }
 }
 
 /**

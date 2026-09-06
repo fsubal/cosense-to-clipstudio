@@ -3,7 +3,7 @@
  * DOM にのみ依存し、window.cosense には依存しない
  */
 
-import { formatPage } from "./format.js";
+import { formatPage, formatManifest } from "./format.js";
 
 /** @type {Record<import("./types.js").TextKind, string>} */
 const KIND_LABELS = {
@@ -64,6 +64,7 @@ const CSS = `
 }
 .ctcs-empty { color: #888; }
 .ctcs-footer {
+  flex-wrap: wrap;
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px; padding: 12px 16px; border-top: 1px solid #ddd;
 }
@@ -78,10 +79,12 @@ const CSS = `
 
 /**
  * @param {import("./types.js").ParseResult} result
+ * @param {import("./types.js").ManifestOptions} [options]
  */
-export function openModal(result) {
+export function openModal(result, options = {}) {
   injectStyle();
 
+  const manifestJSON = formatManifest(result, options);
   let index = 0;
 
   const overlay = el("div", "ctcs-overlay");
@@ -112,6 +115,28 @@ export function openModal(result) {
     closeButton.addEventListener("click", close);
     header.append(title, closeButton);
     modal.appendChild(header);
+
+    const exportBar = el("div", "ctcs-footer");
+    const copyJSON = el("button");
+    copyJSON.textContent = "Computer Use用JSONをコピー";
+    const status = el("span", "ctcs-position");
+    status.setAttribute("role", "status");
+    copyJSON.addEventListener("click", async () => {
+      const ok = await copyText(manifestJSON);
+      status.textContent = ok ? "作品全体のJSONをコピーしました ✓" : "コピーに失敗しました。JSONを書き出して利用してください";
+    });
+    const downloadJSON = el("button");
+    downloadJSON.textContent = "Computer Use用JSONを書き出す";
+    downloadJSON.addEventListener("click", () => {
+      try {
+        downloadManifest(manifestJSON);
+        status.textContent = "作品全体のJSONの書き出しを開始しました";
+      } catch {
+        status.textContent = "書き出しに失敗しました。JSONコピーをお試しください";
+      }
+    });
+    exportBar.append(copyJSON, downloadJSON, status);
+    modal.appendChild(exportBar);
 
     const body = el("div", "ctcs-body");
     modal.appendChild(body);
@@ -211,9 +236,13 @@ async function copyText(text) {
     textarea.style.opacity = "0";
     document.body.appendChild(textarea);
     textarea.select();
-    const ok = document.execCommand("copy");
-    textarea.remove();
-    return ok;
+    try {
+      return document.execCommand("copy");
+    } catch {
+      return false;
+    } finally {
+      textarea.remove();
+    }
   }
 }
 
@@ -250,4 +279,21 @@ function injectStyle() {
   style.id = STYLE_ID;
   style.textContent = CSS;
   document.head.appendChild(style);
+}
+
+/** @param {string} json */
+function downloadManifest(json) {
+  const blob = new Blob([json], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = el("a");
+  link.href = url;
+  link.download = "cosense-to-clipstudio.manifest.json";
+  document.body.appendChild(link);
+  try {
+    link.click();
+  } finally {
+    link.remove();
+    // ダウンロード開始前にURLが無効にならないよう遅延解放する。
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
 }
