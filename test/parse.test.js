@@ -157,3 +157,83 @@ test("空行は無視される", () => {
   assert.equal(pages.length, 1);
   assert.deepEqual(warnings, []);
 });
+
+test("`2-3.` は2ページ目と3ページ目にまたがる見開きになる", () => {
+  const { pages, warnings } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "2-3. 部屋全体が映る見開き", indent: 0 },
+    { text: "「広い部屋だ」", indent: 1 },
+    { text: "4.", indent: 0 },
+  ]);
+  assert.deepEqual(warnings, []);
+  assert.deepEqual(
+    pages.map(({ number, endNumber, label, warnings }) => ({ number, endNumber, label, warnings })),
+    [
+      { number: 1, endNumber: 1, label: "", warnings: [] },
+      { number: 2, endNumber: 3, label: "部屋全体が映る見開き", warnings: [] },
+      { number: 4, endNumber: 4, label: "", warnings: [] },
+    ],
+  );
+  assert.equal(pages[1].items[0].text, "広い部屋だ");
+});
+
+test("単ページの endNumber は number と同じ", () => {
+  const { pages } = parsePlot([{ text: "1.", indent: 0 }]);
+  assert.equal(pages[0].endNumber, 1);
+});
+
+test("見開きに含まれるページ番号を再度使うと重複警告になる", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "2-3.", indent: 0 },
+    { text: "3.", indent: 0 },
+  ]);
+  assert.match(pages[2].warnings[0], /ページ番号 3 が重複/);
+});
+
+test("見開きの両ページが重複していると両方の番号を報告する", () => {
+  const { pages } = parsePlot([
+    { text: "1-2.", indent: 0 },
+    { text: "1-2.", indent: 0 },
+  ]);
+  assert.match(pages[1].warnings[0], /ページ番号 1, 2 が重複/);
+});
+
+test("見開きの直前のページが欠落していると警告になる", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "3-4.", indent: 0 },
+  ]);
+  assert.match(pages[1].warnings[0], /ページ番号 2 が欠落/);
+});
+
+test("終了ページが開始ページ以下の見開きは警告して単ページとして扱う", () => {
+  const { pages } = parsePlot([
+    { text: "3-2.", indent: 0 },
+    { text: "2-2.", indent: 0 },
+  ]);
+  assert.equal(pages[0].number, 3);
+  assert.equal(pages[0].endNumber, 3);
+  assert.match(pages[0].warnings[0], /見開きの範囲 3-2 が不正/);
+  assert.equal(pages[1].endNumber, 2);
+  assert.match(pages[1].warnings[0], /見開きの範囲 2-2 が不正/);
+});
+
+test("3ページ以上にまたがる範囲は受け付けつつ警告する", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "2-4.", indent: 0 },
+    { text: "5.", indent: 0 },
+  ]);
+  assert.equal(pages[1].endNumber, 4);
+  assert.match(pages[1].warnings[0], /2-4 が 3 ページにまたがって/);
+  assert.deepEqual(pages[2].warnings, []);
+});
+
+test("インデントされた `2-3.` はページ見出しにならない", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "2-3.", indent: 1 },
+  ]);
+  assert.equal(pages.length, 1);
+});

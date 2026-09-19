@@ -15,7 +15,8 @@
  * 1ページ分のプロット
  *
  * @typedef {object} PlotPage
- * @property {number} number ページ番号
+ * @property {number} number ページ番号（見開きなら開始ページ）
+ * @property {number} endNumber 終了ページ番号。単ページなら number と同じ、見開き `2-3.` なら 3
  * @property {string} label ページ見出しの補足（`1. 通勤のシーン` の「通勤のシーン」部分。無ければ空文字）
  * @property {PlotItem[]} items
  * @property {string[]} warnings このページに紐づく警告

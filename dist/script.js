@@ -56,7 +56,7 @@
   }
 
   // src/parse.js
-  var PAGE_HEADING_PATTERN = /^(\d+)\.(?:\s+(.*))?$/;
+  var PAGE_HEADING_PATTERN = /^(\d+)(?:-(\d+))?\.(?:\s+(.*))?$/;
   var AUTHOR_COMMENT_PATTERN = /^\[[^[\]]+\.icon\]/;
   var STRIKETHROUGH_PATTERN = /\[-[^\]]*\]/g;
   var KIND_PATTERNS = [
@@ -81,24 +81,22 @@
       }
       const heading = line.indent === 0 ? text.match(PAGE_HEADING_PATTERN) : null;
       if (heading) {
-        const number = Number(heading[1]);
-        const page = {
-          number,
-          label: heading[2] ?? "",
-          items: [],
-          warnings: []
-        };
-        if (seenNumbers.has(number)) {
-          page.warnings.push(`\u30DA\u30FC\u30B8\u756A\u53F7 ${number} \u304C\u91CD\u8907\u3057\u3066\u3044\u307E\u3059`);
-        } else if (number > expectedNumber) {
+        const page = createPage(heading);
+        const numbers = pageNumbers(page);
+        const duplicated = numbers.filter((number) => seenNumbers.has(number));
+        if (duplicated.length > 0) {
+          page.warnings.push(`\u30DA\u30FC\u30B8\u756A\u53F7 ${duplicated.join(", ")} \u304C\u91CD\u8907\u3057\u3066\u3044\u307E\u3059`);
+        } else if (page.number > expectedNumber) {
           page.warnings.push(
-            number - expectedNumber === 1 ? `\u30DA\u30FC\u30B8\u756A\u53F7 ${expectedNumber} \u304C\u6B20\u843D\u3057\u3066\u3044\u307E\u3059` : `\u30DA\u30FC\u30B8\u756A\u53F7 ${expectedNumber}\u301C${number - 1} \u304C\u6B20\u843D\u3057\u3066\u3044\u307E\u3059`
+            page.number - expectedNumber === 1 ? `\u30DA\u30FC\u30B8\u756A\u53F7 ${expectedNumber} \u304C\u6B20\u843D\u3057\u3066\u3044\u307E\u3059` : `\u30DA\u30FC\u30B8\u756A\u53F7 ${expectedNumber}\u301C${page.number - 1} \u304C\u6B20\u843D\u3057\u3066\u3044\u307E\u3059`
           );
-        } else if (number < expectedNumber) {
-          page.warnings.push(`\u30DA\u30FC\u30B8\u756A\u53F7 ${number} \u304C\u6607\u9806\u3067\u306F\u3042\u308A\u307E\u305B\u3093`);
+        } else if (page.number < expectedNumber) {
+          page.warnings.push(`\u30DA\u30FC\u30B8\u756A\u53F7 ${page.number} \u304C\u6607\u9806\u3067\u306F\u3042\u308A\u307E\u305B\u3093`);
         }
-        seenNumbers.add(number);
-        expectedNumber = Math.max(expectedNumber, number + 1);
+        for (const number of numbers) {
+          seenNumbers.add(number);
+        }
+        expectedNumber = Math.max(expectedNumber, page.endNumber + 1);
         pages.push(page);
         currentPage = page;
         return;
@@ -113,6 +111,34 @@
       }
     });
     return { pages, warnings };
+  }
+  function createPage(heading) {
+    const number = Number(heading[1]);
+    const label = heading[3] ?? "";
+    const warnings = [];
+    let endNumber = number;
+    if (heading[2] !== void 0) {
+      const rangeEnd = Number(heading[2]);
+      if (rangeEnd <= number) {
+        warnings.push(
+          `\u898B\u958B\u304D\u306E\u7BC4\u56F2 ${number}-${rangeEnd} \u304C\u4E0D\u6B63\u306A\u306E\u3067 ${number} \u30DA\u30FC\u30B8\u76EE\u3068\u3057\u3066\u6271\u3044\u307E\u3059`
+        );
+      } else {
+        endNumber = rangeEnd;
+        const span = rangeEnd - number + 1;
+        if (span > 2) {
+          warnings.push(`\u898B\u958B\u304D ${number}-${rangeEnd} \u304C ${span} \u30DA\u30FC\u30B8\u306B\u307E\u305F\u304C\u3063\u3066\u3044\u307E\u3059`);
+        }
+      }
+    }
+    return { number, endNumber, label, items: [], warnings };
+  }
+  function pageNumbers(page) {
+    const numbers = [];
+    for (let number = page.number; number <= page.endNumber; number += 1) {
+      numbers.push(number);
+    }
+    return numbers;
   }
   function classify(text, sourceLine) {
     for (const { kind, pattern } of KIND_PATTERNS) {
@@ -136,6 +162,7 @@
       pageCount: result.pages.length,
       pages: result.pages.map((page) => ({
         number: page.number,
+        endNumber: page.endNumber,
         label: page.label,
         items: page.items.map(({ kind, text, sourceLine }) => ({ kind, text, sourceLine })),
         warnings: [...page.warnings]
@@ -280,7 +307,8 @@
       }
       const page = result.pages[index];
       const pageTitle = el("h3", "ctcs-page-title");
-      pageTitle.textContent = page.label ? `${page.number}\u30DA\u30FC\u30B8\u76EE \u2014 ${page.label}` : `${page.number}\u30DA\u30FC\u30B8\u76EE`;
+      const range = page.endNumber > page.number ? `${page.number}-${page.endNumber}\u30DA\u30FC\u30B8\u76EE\uFF08\u898B\u958B\u304D\uFF09` : `${page.number}\u30DA\u30FC\u30B8\u76EE`;
+      pageTitle.textContent = page.label ? `${range} \u2014 ${page.label}` : range;
       body.appendChild(pageTitle);
       appendWarnings(body, [...result.warnings, ...page.warnings]);
       if (page.items.length === 0) {

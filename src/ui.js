@@ -153,9 +153,11 @@ export function openModal(result, options = {}) {
     const page = result.pages[index];
 
     const pageTitle = el("h3", "ctcs-page-title");
-    pageTitle.textContent = page.label
-      ? `${page.number}ページ目 — ${page.label}`
-      : `${page.number}ページ目`;
+    const range =
+      page.endNumber > page.number
+        ? `${page.number}-${page.endNumber}ページ目（見開き）`
+        : `${page.number}ページ目`;
+    pageTitle.textContent = page.label ? `${range} — ${page.label}` : range;
     body.appendChild(pageTitle);
 
     appendWarnings(body, [...result.warnings, ...page.warnings]);

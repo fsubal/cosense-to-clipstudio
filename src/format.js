@@ -27,6 +27,7 @@ export function createManifest(result, options = {}) {
     pageCount: result.pages.length,
     pages: result.pages.map((page) => ({
       number: page.number,
+      endNumber: page.endNumber,
       label: page.label,
       items: page.items.map(({ kind, text, sourceLine }) => ({ kind, text, sourceLine })),
       warnings: [...page.warnings],

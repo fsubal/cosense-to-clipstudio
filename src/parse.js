@@ -3,8 +3,11 @@
  * 文字列とインデントの配列（PlotLine[]）だけを入力に取る
  */
 
-/** インデント0で `1.` `2. 通勤のシーン` のような行をページ見出しとみなす */
-const PAGE_HEADING_PATTERN = /^(\d+)\.(?:\s+(.*))?$/;
+/**
+ * インデント0で `1.` `2. 通勤のシーン` のような行をページ見出しとみなす。
+ * `2-3. 部屋全体が映る見開き` のように `開始-終了.` と書くと見開き（複数ページにまたがる区切り）
+ */
+const PAGE_HEADING_PATTERN = /^(\d+)(?:-(\d+))?\.(?:\s+(.*))?$/;
 
 /** `[fsubal.icon]` のようなプロフィールアイコンから始まる行は作者コメント */
 const AUTHOR_COMMENT_PATTERN = /^\[[^[\]]+\.icon\]/;
@@ -47,29 +50,26 @@ export function parsePlot(lines) {
 
     const heading = line.indent === 0 ? text.match(PAGE_HEADING_PATTERN) : null;
     if (heading) {
-      const number = Number(heading[1]);
-      /** @type {import("./types.js").PlotPage} */
-      const page = {
-        number,
-        label: heading[2] ?? "",
-        items: [],
-        warnings: [],
-      };
+      const page = createPage(heading);
+      const numbers = pageNumbers(page);
 
-      if (seenNumbers.has(number)) {
-        page.warnings.push(`ページ番号 ${number} が重複しています`);
-      } else if (number > expectedNumber) {
+      const duplicated = numbers.filter((number) => seenNumbers.has(number));
+      if (duplicated.length > 0) {
+        page.warnings.push(`ページ番号 ${duplicated.join(", ")} が重複しています`);
+      } else if (page.number > expectedNumber) {
         page.warnings.push(
-          number - expectedNumber === 1
+          page.number - expectedNumber === 1
             ? `ページ番号 ${expectedNumber} が欠落しています`
-            : `ページ番号 ${expectedNumber}〜${number - 1} が欠落しています`,
+            : `ページ番号 ${expectedNumber}〜${page.number - 1} が欠落しています`,
         );
-      } else if (number < expectedNumber) {
-        page.warnings.push(`ページ番号 ${number} が昇順ではありません`);
+      } else if (page.number < expectedNumber) {
+        page.warnings.push(`ページ番号 ${page.number} が昇順ではありません`);
       }
 
-      seenNumbers.add(number);
-      expectedNumber = Math.max(expectedNumber, number + 1);
+      for (const number of numbers) {
+        seenNumbers.add(number);
+      }
+      expectedNumber = Math.max(expectedNumber, page.endNumber + 1);
       pages.push(page);
       currentPage = page;
       return;
@@ -90,6 +90,52 @@ export function parsePlot(lines) {
   });
 
   return { pages, warnings };
+}
+
+/**
+ * ページ見出しのマッチ結果から空のページを作る。
+ * 見開き（`2-3.`）の範囲が不正なら警告を付けて開始ページだけの区切りとして扱う
+ *
+ * @param {RegExpMatchArray} heading
+ * @returns {import("./types.js").PlotPage}
+ */
+function createPage(heading) {
+  const number = Number(heading[1]);
+  const label = heading[3] ?? "";
+  /** @type {string[]} */
+  const warnings = [];
+  let endNumber = number;
+
+  if (heading[2] !== undefined) {
+    const rangeEnd = Number(heading[2]);
+    if (rangeEnd <= number) {
+      warnings.push(
+        `見開きの範囲 ${number}-${rangeEnd} が不正なので ${number} ページ目として扱います`,
+      );
+    } else {
+      endNumber = rangeEnd;
+      const span = rangeEnd - number + 1;
+      if (span > 2) {
+        warnings.push(`見開き ${number}-${rangeEnd} が ${span} ページにまたがっています`);
+      }
+    }
+  }
+
+  return { number, endNumber, label, items: [], warnings };
+}
+
+/**
+ * ページ区切りが含むページ番号の一覧。単ページなら1要素、見開きなら範囲内の全番号
+ *
+ * @param {import("./types.js").PlotPage} page
+ * @returns {number[]}
+ */
+function pageNumbers(page) {
+  const numbers = [];
+  for (let number = page.number; number <= page.endNumber; number += 1) {
+    numbers.push(number);
+  }
+  return numbers;
 }
 
 /**
