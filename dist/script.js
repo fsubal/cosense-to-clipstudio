@@ -129,6 +129,9 @@
         if (span > 2) {
           warnings.push(`\u898B\u958B\u304D ${number}-${rangeEnd} \u304C ${span} \u30DA\u30FC\u30B8\u306B\u307E\u305F\u304C\u3063\u3066\u3044\u307E\u3059`);
         }
+        if (number % 2 === 1) {
+          warnings.push(`\u898B\u958B\u304D ${number}-${rangeEnd} \u304C\u5947\u6570\u30DA\u30FC\u30B8\u304B\u3089\u59CB\u307E\u3063\u3066\u3044\u307E\u3059`);
+        }
       }
     }
     return { number, endNumber, label, items: [], warnings };

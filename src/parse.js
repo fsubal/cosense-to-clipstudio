@@ -118,6 +118,11 @@ function createPage(heading) {
       if (span > 2) {
         warnings.push(`見開き ${number}-${rangeEnd} が ${span} ページにまたがっています`);
       }
+      // 右綴じの漫画では見開きは偶数ページから始まる（2-3, 4-5, …）。
+      // 綴じ方や開始ページの設定次第なのでエラーにはせず、見開きとして扱いつつ知らせる
+      if (number % 2 === 1) {
+        warnings.push(`見開き ${number}-${rangeEnd} が奇数ページから始まっています`);
+      }
     }
   }
 

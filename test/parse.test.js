@@ -193,18 +193,19 @@ test("見開きに含まれるページ番号を再度使うと重複警告に�
 
 test("見開きの両ページが重複していると両方の番号を報告する", () => {
   const { pages } = parsePlot([
-    { text: "1-2.", indent: 0 },
-    { text: "1-2.", indent: 0 },
+    { text: "1.", indent: 0 },
+    { text: "2-3.", indent: 0 },
+    { text: "2-3.", indent: 0 },
   ]);
-  assert.match(pages[1].warnings[0], /ページ番号 1, 2 が重複/);
+  assert.deepEqual(pages[2].warnings, ["ページ番号 2, 3 が重複しています"]);
 });
 
 test("見開きの直前のページが欠落していると警告になる", () => {
   const { pages } = parsePlot([
     { text: "1.", indent: 0 },
-    { text: "3-4.", indent: 0 },
+    { text: "4-5.", indent: 0 },
   ]);
-  assert.match(pages[1].warnings[0], /ページ番号 2 が欠落/);
+  assert.deepEqual(pages[1].warnings, ["ページ番号 2〜3 が欠落しています"]);
 });
 
 test("終了ページが開始ページ以下の見開きは警告して単ページとして扱う", () => {
@@ -236,4 +237,25 @@ test("インデントされた `2-3.` はページ見出しにならない", () 
     { text: "2-3.", indent: 1 },
   ]);
   assert.equal(pages.length, 1);
+});
+
+test("奇数ページから始まる見開きは警告しつつ見開きとして扱う", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "2.", indent: 0 },
+    { text: "3-4.", indent: 0 },
+    { text: "5.", indent: 0 },
+  ]);
+  assert.equal(pages[2].number, 3);
+  assert.equal(pages[2].endNumber, 4);
+  assert.deepEqual(pages[2].warnings, ["見開き 3-4 が奇数ページから始まっています"]);
+  assert.deepEqual(pages[3].warnings, []);
+});
+
+test("偶数ページから始まる見開きには奇数の警告が出ない", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "2-3.", indent: 0 },
+  ]);
+  assert.deepEqual(pages[1].warnings, []);
 });
