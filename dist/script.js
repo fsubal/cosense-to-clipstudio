@@ -59,10 +59,10 @@
   var PAGE_HEADING_PATTERN = /^(\d+)(?:-(\d+))?\.(?:\s+(.*))?$/;
   var AUTHOR_COMMENT_PATTERN = /^\[[^[\]]+\.icon\]/;
   var STRIKETHROUGH_PATTERN = /\[-[^\]]*\]/g;
-  var KIND_PATTERNS = [
-    { kind: "dialogue", pattern: /^「([\s\S]*)」$/ },
-    { kind: "narration", pattern: /^［([\s\S]*)］$/ },
-    { kind: "monologue", pattern: /^（([\s\S]*)）$/ }
+  var BRACKETS = [
+    { kind: "dialogue", open: "\u300C", close: "\u300D" },
+    { kind: "narration", open: "\uFF3B", close: "\uFF3D" },
+    { kind: "monologue", open: "\uFF08", close: "\uFF09" }
   ];
   function parsePlot(lines) {
     const pages = [];
@@ -101,14 +101,13 @@
         currentPage = page;
         return;
       }
-      const item = classify(text, sourceLine);
       if (!currentPage) {
         warnings.push(`\u30DA\u30FC\u30B8\u898B\u51FA\u3057\u3088\u308A\u524D\u306E\u884C\u3092\u7121\u8996\u3057\u307E\u3057\u305F: ${text}`);
         return;
       }
-      if (item) {
-        currentPage.items.push(item);
-      }
+      const { items, notes } = classify(text, sourceLine);
+      currentPage.items.push(...items);
+      currentPage.notes.push(...notes);
     });
     return { pages, warnings };
   }
@@ -134,7 +133,7 @@
         }
       }
     }
-    return { number, endNumber, label, items: [], warnings };
+    return { number, endNumber, label, items: [], warnings, notes: [] };
   }
   function pageNumbers(page) {
     const numbers = [];
@@ -144,13 +143,61 @@
     return numbers;
   }
   function classify(text, sourceLine) {
-    for (const { kind, pattern } of KIND_PATTERNS) {
-      const matched = text.match(pattern);
-      if (matched) {
-        return { kind, text: matched[1], sourceLine };
+    const split = splitSegments(text);
+    if (!split) {
+      return { items: [], notes: [] };
+    }
+    const items = split.segments.map(({ kind, text: text2 }) => ({ kind, text: text2, sourceLine }));
+    const notes = [];
+    const prefix = split.prefix.trim();
+    if (prefix !== "") {
+      notes.push(`\u62EC\u5F27\u306E\u524D\u306E\u300C${prefix}\u300D\u3092\u9664\u5916\u3057\u307E\u3057\u305F: ${text}`);
+    }
+    if (items.length > 1) {
+      notes.push(`1\u884C\u3092${items.length}\u9805\u76EE\u306B\u5206\u5272\u3057\u307E\u3057\u305F: ${text}`);
+    }
+    return { items, notes };
+  }
+  function splitSegments(text) {
+    const chars = Array.from(text);
+    const segments = [];
+    const stack = [];
+    let prefix = "";
+    let trailing = "";
+    let segmentStart = 0;
+    for (let i = 0; i < chars.length; i += 1) {
+      const char = chars[i];
+      const opener = BRACKETS.find((bracket) => bracket.open === char);
+      const closer = BRACKETS.find((bracket) => bracket.close === char);
+      if (stack.length === 0) {
+        if (opener) {
+          if (trailing.trim() !== "") return null;
+          stack.push(opener);
+          segmentStart = i + 1;
+        } else if (closer) {
+          return null;
+        } else if (segments.length === 0) {
+          prefix += char;
+        } else {
+          trailing += char;
+        }
+        continue;
+      }
+      if (opener) {
+        stack.push(opener);
+      } else if (closer) {
+        if (stack[stack.length - 1] !== closer) return null;
+        stack.pop();
+        if (stack.length === 0) {
+          segments.push({ kind: closer.kind, text: chars.slice(segmentStart, i).join("") });
+          trailing = "";
+        }
       }
     }
-    return null;
+    if (stack.length > 0 || segments.length === 0 || trailing.trim() !== "") {
+      return null;
+    }
+    return { prefix, segments };
   }
 
   // src/format.js
@@ -168,7 +215,8 @@
         endNumber: page.endNumber,
         label: page.label,
         items: page.items.map(({ kind, text, sourceLine }) => ({ kind, text, sourceLine })),
-        warnings: [...page.warnings]
+        warnings: [...page.warnings],
+        notes: [...page.notes]
       })),
       warnings: [...result.warnings],
       ...options.documentSettings === void 0 ? {} : {
@@ -219,6 +267,12 @@
   color: #664d03; list-style: none;
 }
 .ctcs-warnings li::before { content: "\u26A0 "; }
+.ctcs-notes {
+  margin: 0 0 12px; padding: 8px 12px;
+  background: #e7f1ff; border: 1px solid #b6d4fe; border-radius: 4px;
+  color: #084298; list-style: none;
+}
+.ctcs-notes li::before { content: "\u2139 "; }
 .ctcs-items { margin: 0; padding: 0; list-style: none; }
 .ctcs-items li {
   display: flex; align-items: baseline; gap: 8px;
@@ -314,6 +368,7 @@
       pageTitle.textContent = page.label ? `${range} \u2014 ${page.label}` : range;
       body.appendChild(pageTitle);
       appendWarnings(body, [...result.warnings, ...page.warnings]);
+      appendNotes(body, page.notes);
       if (page.items.length === 0) {
         const empty = el("p", "ctcs-empty");
         empty.textContent = "\u62BD\u51FA\u9805\u76EE\u306F\u3042\u308A\u307E\u305B\u3093\uFF080\u4EF6\uFF09";
@@ -387,11 +442,17 @@
     }
   }
   function appendWarnings(parent, warnings) {
-    if (warnings.length === 0) return;
-    const list = el("ul", "ctcs-warnings");
-    for (const warning of warnings) {
+    appendMessages(parent, "ctcs-warnings", warnings);
+  }
+  function appendNotes(parent, notes) {
+    appendMessages(parent, "ctcs-notes", notes);
+  }
+  function appendMessages(parent, className, messages) {
+    if (messages.length === 0) return;
+    const list = el("ul", className);
+    for (const message of messages) {
       const li = el("li");
-      li.textContent = warning;
+      li.textContent = message;
       list.appendChild(li);
     }
     parent.appendChild(list);

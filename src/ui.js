@@ -45,6 +45,12 @@ const CSS = `
   color: #664d03; list-style: none;
 }
 .ctcs-warnings li::before { content: "⚠ "; }
+.ctcs-notes {
+  margin: 0 0 12px; padding: 8px 12px;
+  background: #e7f1ff; border: 1px solid #b6d4fe; border-radius: 4px;
+  color: #084298; list-style: none;
+}
+.ctcs-notes li::before { content: "ℹ "; }
 .ctcs-items { margin: 0; padding: 0; list-style: none; }
 .ctcs-items li {
   display: flex; align-items: baseline; gap: 8px;
@@ -161,6 +167,7 @@ export function openModal(result, options = {}) {
     body.appendChild(pageTitle);
 
     appendWarnings(body, [...result.warnings, ...page.warnings]);
+    appendNotes(body, page.notes);
 
     if (page.items.length === 0) {
       const empty = el("p", "ctcs-empty");
@@ -253,11 +260,29 @@ async function copyText(text) {
  * @param {string[]} warnings
  */
 function appendWarnings(parent, warnings) {
-  if (warnings.length === 0) return;
-  const list = el("ul", "ctcs-warnings");
-  for (const warning of warnings) {
+  appendMessages(parent, "ctcs-warnings", warnings);
+}
+
+/**
+ * 警告ではないが確認の目安になる情報（部分抽出した行など）
+ * @param {HTMLElement} parent
+ * @param {string[]} notes
+ */
+function appendNotes(parent, notes) {
+  appendMessages(parent, "ctcs-notes", notes);
+}
+
+/**
+ * @param {HTMLElement} parent
+ * @param {string} className
+ * @param {string[]} messages
+ */
+function appendMessages(parent, className, messages) {
+  if (messages.length === 0) return;
+  const list = el("ul", className);
+  for (const message of messages) {
     const li = el("li");
-    li.textContent = warning;
+    li.textContent = message;
     list.appendChild(li);
   }
   parent.appendChild(list);

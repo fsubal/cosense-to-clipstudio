@@ -19,8 +19,8 @@ test("Cosenseから全種別・ラベル・元行番号・空ページをJSONへ
         { kind: "dialogue", text: "こんにちは", sourceLine: 2 },
         { kind: "narration", text: "翌朝", sourceLine: 3 },
         { kind: "monologue", text: "眠い", sourceLine: 4 },
-      ], warnings: [] },
-      { number: 2, endNumber: 2, label: "", items: [], warnings: [] },
+      ], warnings: [], notes: [] },
+      { number: 2, endNumber: 2, label: "", items: [], warnings: [], notes: [] },
     ], warnings: [],
   });
   assert.equal(formatPage(result.pages[0]), "こんにちは\n\n翌朝\n\n眠い");
@@ -64,7 +64,7 @@ test("設定のページ数は抽出数と独立し、入力との参照共有�
 test("改行・引用符・バックスラッシュをJSONで往復できる", () => {
   const result = { pages: [{ number: 1, endNumber: 1, label: "", items: [
     { kind: /** @type {const} */ ("dialogue"), text: '日本語\n"引用"\\末尾', sourceLine: 0 },
-  ], warnings: [] }], warnings: [] };
+  ], warnings: [], notes: [] }], warnings: [] };
   assert.deepEqual(JSON.parse(formatManifest(result)).pages, result.pages);
 });
 
@@ -78,4 +78,17 @@ test("見開きの終了ページ番号をJSONへ保持する", () => {
     [{ number: 1, endNumber: 1 }, { number: 2, endNumber: 3 }],
   );
   assert.equal(manifest.pageCount, 2);
+});
+
+test("分割・除外の情報をJSONへ保持する", () => {
+  const manifest = createManifest(parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "あ「はい」「いいえ」", indent: 1 },
+  ]));
+  assert.deepEqual(manifest.pages[0].items.map((item) => item.text), ["はい", "いいえ"]);
+  assert.deepEqual(manifest.pages[0].notes, [
+    "括弧の前の「あ」を除外しました: あ「はい」「いいえ」",
+    "1行を2項目に分割しました: あ「はい」「いいえ」",
+  ]);
+  assert.deepEqual(manifest.pages[0].warnings, []);
 });

@@ -259,3 +259,129 @@ test("偶数ページから始まる見開きには奇数の警告が出ない",
   ]);
   assert.deepEqual(pages[1].warnings, []);
 });
+
+/** @param {import("../src/types.js").PlotPage} page */
+const kindsAndTexts = (page) => page.items.map(({ kind, text }) => ({ kind, text }));
+
+test("1行に複数の括弧があれば順に別項目になる", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "「でさー」「新譜マジやばいよね」「語彙がなくなるー」", indent: 1 },
+  ]);
+  assert.deepEqual(kindsAndTexts(pages[0]), [
+    { kind: "dialogue", text: "でさー" },
+    { kind: "dialogue", text: "新譜マジやばいよね" },
+    { kind: "dialogue", text: "語彙がなくなるー" },
+  ]);
+  assert.deepEqual(pages[0].notes, [
+    "1行を3項目に分割しました: 「でさー」「新譜マジやばいよね」「語彙がなくなるー」",
+  ]);
+  assert.deepEqual(pages[0].warnings, []);
+});
+
+test("分割した項目はすべて同じ sourceLine を持つ", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0, sourceLine: 5 },
+    { text: "「あ」「い」", indent: 1, sourceLine: 6 },
+  ]);
+  assert.deepEqual(pages[0].items.map((item) => item.sourceLine), [6, 6]);
+});
+
+test("最初の括弧より前の書き文字は出力せず情報として知らせる", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "あ「はい」", indent: 1 },
+    { text: "わー（キレーな人…）", indent: 1 },
+  ]);
+  assert.deepEqual(kindsAndTexts(pages[0]), [
+    { kind: "dialogue", text: "はい" },
+    { kind: "monologue", text: "キレーな人…" },
+  ]);
+  assert.deepEqual(pages[0].notes, [
+    "括弧の前の「あ」を除外しました: あ「はい」",
+    "括弧の前の「わー」を除外しました: わー（キレーな人…）",
+  ]);
+});
+
+test("話者名の前置きも括弧の中だけを出力する", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "主人公「はい」", indent: 1 },
+    { text: "主人公 「はい」", indent: 1 },
+  ]);
+  assert.deepEqual(kindsAndTexts(pages[0]), [
+    { kind: "dialogue", text: "はい" },
+    { kind: "dialogue", text: "はい" },
+  ]);
+  assert.match(pages[0].notes[1], /^括弧の前の「主人公」を除外しました/);
+});
+
+test("括弧の内側の括弧は本文の一部として残る", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "［「その場で出た言葉こそが本物だ」と言う人が苦手だった］", indent: 1 },
+    { text: "「え（本気？）」", indent: 1 },
+  ]);
+  assert.deepEqual(kindsAndTexts(pages[0]), [
+    { kind: "narration", text: "「その場で出た言葉こそが本物だ」と言う人が苦手だった" },
+    { kind: "dialogue", text: "え（本気？）" },
+  ]);
+  assert.deepEqual(pages[0].notes, []);
+});
+
+test("種別の違う括弧が並んだ行も順に別項目になる", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "［翌朝］「おはよう」", indent: 1 },
+    { text: "「セリフ」 （モノローグ）", indent: 1 },
+  ]);
+  assert.deepEqual(kindsAndTexts(pages[0]), [
+    { kind: "narration", text: "翌朝" },
+    { kind: "dialogue", text: "おはよう" },
+    { kind: "dialogue", text: "セリフ" },
+    { kind: "monologue", text: "モノローグ" },
+  ]);
+});
+
+test("括弧の後ろや間に地の文が続く行はト書きになる", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "主人公が「はい」と言う", indent: 1 },
+    { text: "「はい」と「いいえ」", indent: 1 },
+  ]);
+  assert.deepEqual(pages[0].items, []);
+  assert.deepEqual(pages[0].notes, []);
+});
+
+test("括弧の対応が取れない行はト書きになる", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "「閉じ忘れ", indent: 1 },
+    { text: "「あ］", indent: 1 },
+    { text: "」あ「", indent: 1 },
+    { text: "あ）「はい」", indent: 1 },
+  ]);
+  assert.deepEqual(pages[0].items, []);
+  assert.deepEqual(pages[0].notes, []);
+});
+
+test("書き文字の除外と分割の両方があれば情報を2件出す", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "あ「はい」「いいえ」", indent: 1 },
+  ]);
+  assert.deepEqual(kindsAndTexts(pages[0]), [
+    { kind: "dialogue", text: "はい" },
+    { kind: "dialogue", text: "いいえ" },
+  ]);
+  assert.equal(pages[0].notes.length, 2);
+});
+
+test("見出し前の行は分割対象でも警告だけになる", () => {
+  const { pages, warnings } = parsePlot([
+    { text: "「あ」「い」", indent: 1 },
+    { text: "1.", indent: 0 },
+  ]);
+  assert.equal(warnings.length, 1);
+  assert.deepEqual(pages[0].notes, []);
+});

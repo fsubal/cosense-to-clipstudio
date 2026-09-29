@@ -15,11 +15,14 @@ const AUTHOR_COMMENT_PATTERN = /^\[[^[\]]+\.icon\]/;
 /** `[- 取り消し線]` の記法（`[-* ...]` などの複合装飾も含む）は無かったものとして扱う */
 const STRIKETHROUGH_PATTERN = /\[-[^\]]*\]/g;
 
-/** @type {{ kind: import("./types.js").TextKind, pattern: RegExp }[]} */
-const KIND_PATTERNS = [
-  { kind: "dialogue", pattern: /^「([\s\S]*)」$/ },
-  { kind: "narration", pattern: /^［([\s\S]*)］$/ },
-  { kind: "monologue", pattern: /^（([\s\S]*)）$/ },
+/**
+ * 行の中で本文を囲む括弧の対。行の最上位で閉じた括弧ごとに1項目になる
+ * @type {{ kind: import("./types.js").TextKind, open: string, close: string }[]}
+ */
+const BRACKETS = [
+  { kind: "dialogue", open: "「", close: "」" },
+  { kind: "narration", open: "［", close: "］" },
+  { kind: "monologue", open: "（", close: "）" },
 ];
 
 /**
@@ -75,18 +78,16 @@ export function parsePlot(lines) {
       return;
     }
 
-    const item = classify(text, sourceLine);
-
     if (!currentPage) {
       // ページ見出しより前の行。ト書きであっても構造の崩れなので知らせる
       warnings.push(`ページ見出しより前の行を無視しました: ${text}`);
       return;
     }
 
-    if (item) {
-      currentPage.items.push(item);
-    }
-    // 括弧で囲まれていない行はト書きとして出力しない
+    // 括弧で囲まれた部分が無い行はト書きとして出力しない（items が空）
+    const { items, notes } = classify(text, sourceLine);
+    currentPage.items.push(...items);
+    currentPage.notes.push(...notes);
   });
 
   return { pages, warnings };
@@ -126,7 +127,7 @@ function createPage(heading) {
     }
   }
 
-  return { number, endNumber, label, items: [], warnings };
+  return { number, endNumber, label, items: [], warnings, notes: [] };
 }
 
 /**
@@ -144,19 +145,89 @@ function pageNumbers(page) {
 }
 
 /**
- * 行全体を囲む括弧の種類からテキスト種別を判定する。
- * どの括弧でも囲まれていなければ null（ト書き）
+ * 1行を括弧ごとのテキスト項目に分解する。
+ * 括弧で囲まれた部分が無い行や、括弧の後ろに地の文が続く行はト書きとして空配列を返す。
+ * 最初の括弧より前の地の文（書き文字・話者名）は出力せず、除外したことを notes で知らせる
  *
  * @param {string} text
  * @param {number} sourceLine
- * @returns {import("./types.js").PlotItem | null}
+ * @returns {{ items: import("./types.js").PlotItem[], notes: string[] }}
  */
 function classify(text, sourceLine) {
-  for (const { kind, pattern } of KIND_PATTERNS) {
-    const matched = text.match(pattern);
-    if (matched) {
-      return { kind, text: matched[1], sourceLine };
+  const split = splitSegments(text);
+  if (!split) {
+    return { items: [], notes: [] };
+  }
+
+  const items = split.segments.map(({ kind, text }) => ({ kind, text, sourceLine }));
+  /** @type {string[]} */
+  const notes = [];
+  const prefix = split.prefix.trim();
+  if (prefix !== "") {
+    notes.push(`括弧の前の「${prefix}」を除外しました: ${text}`);
+  }
+  if (items.length > 1) {
+    notes.push(`1行を${items.length}項目に分割しました: ${text}`);
+  }
+  return { items, notes };
+}
+
+/**
+ * 行を「最上位で閉じた括弧の並び」と「最初の括弧より前の地の文」に分ける。
+ * 括弧の内側の括弧は本文の一部として残す。
+ *
+ * 次の場合は括弧の並びとして解釈できないので null を返す（行全体がト書き）
+ * - 括弧の対応が取れない（閉じ忘れ・種類の不一致・深さ0での閉じ括弧）
+ * - 括弧で囲まれた部分が1つも無い
+ * - 括弧の間や後ろに空白以外の地の文がある
+ *
+ * @param {string} text
+ * @returns {{ prefix: string, segments: { kind: import("./types.js").TextKind, text: string }[] } | null}
+ */
+function splitSegments(text) {
+  const chars = Array.from(text);
+  /** @type {{ kind: import("./types.js").TextKind, text: string }[]} */
+  const segments = [];
+  /** @type {(typeof BRACKETS)[number][]} */
+  const stack = [];
+  let prefix = "";
+  let trailing = "";
+  let segmentStart = 0;
+
+  for (let i = 0; i < chars.length; i += 1) {
+    const char = chars[i];
+    const opener = BRACKETS.find((bracket) => bracket.open === char);
+    const closer = BRACKETS.find((bracket) => bracket.close === char);
+
+    if (stack.length === 0) {
+      if (opener) {
+        if (trailing.trim() !== "") return null;
+        stack.push(opener);
+        segmentStart = i + 1;
+      } else if (closer) {
+        return null;
+      } else if (segments.length === 0) {
+        prefix += char;
+      } else {
+        trailing += char;
+      }
+      continue;
+    }
+
+    if (opener) {
+      stack.push(opener);
+    } else if (closer) {
+      if (stack[stack.length - 1] !== closer) return null;
+      stack.pop();
+      if (stack.length === 0) {
+        segments.push({ kind: closer.kind, text: chars.slice(segmentStart, i).join("") });
+        trailing = "";
+      }
     }
   }
-  return null;
+
+  if (stack.length > 0 || segments.length === 0 || trailing.trim() !== "") {
+    return null;
+  }
+  return { prefix, segments };
 }

@@ -31,6 +31,7 @@ export function createManifest(result, options = {}) {
       label: page.label,
       items: page.items.map(({ kind, text, sourceLine }) => ({ kind, text, sourceLine })),
       warnings: [...page.warnings],
+      notes: [...page.notes],
     })),
     warnings: [...result.warnings],
     ...(options.documentSettings === undefined ? {} : {

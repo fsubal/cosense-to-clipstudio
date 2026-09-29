@@ -20,6 +20,7 @@
  * @property {string} label ページ見出しの補足（`1. 通勤のシーン` の「通勤のシーン」部分。無ければ空文字）
  * @property {PlotItem[]} items
  * @property {string[]} warnings このページに紐づく警告
+ * @property {string[]} notes 構造の崩れではないが確認の目安になる情報（1行を複数項目に分割した、括弧の前の地の文を除外した、など）
  */
 
 /**
