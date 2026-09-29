@@ -1,0 +1,62 @@
+# dist/script.js を CI でビルドし、コミットごとにダウンロードできるようにする。
+# - すべての push / pull request: テスト → ビルド → Actions の artifact にアップロード
+# - main への push: さらに `build-<短縮SHA>` タグの Release を作り、script.js を添付する
+#   （最新版は https://github.com/<owner>/<repo>/releases/latest/download/script.js で取れる）
+name: build
+
+on:
+  push:
+    branches: ["**"] # Release が作るタグの push では走らせない
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      short_sha: ${{ steps.meta.outputs.short_sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+      - id: meta
+        run: echo "short_sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: script-${{ steps.meta.outputs.short_sha }}
+          path: dist/script.js
+          if-no-files-found: error
+
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: script-${{ needs.build.outputs.short_sha }}
+          path: dist
+
+      - name: Create release for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: build-${{ needs.build.outputs.short_sha }}
+          TITLE: ${{ github.event.head_commit.message }}
+        run: |
+          # タイトルはコミットメッセージの1行目、本文にコミットへのリンクを入れる
+          gh release create "$TAG" dist/script.js \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "${TITLE%%$'\n'*}" \
+            --notes "Built from ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
