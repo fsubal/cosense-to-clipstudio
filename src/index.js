@@ -1,6 +1,6 @@
 import { CosensePage } from "./cosense.js";
 import { parsePlot } from "./parse.js";
-import { openModal } from "./ui.js";
+import { ClipStudioExportModal } from "./ui.js";
 
 const ICON =
   "data:image/svg+xml," +
@@ -19,7 +19,8 @@ function main() {
         return;
       }
       const result = parsePlot(cosensePage.toPlotLines());
-      openModal(result, {
+
+      ClipStudioExportModal.openModal(result, {
         source: {
           title: cosensePage.lines[0]?.text,
           url: window.location.href,

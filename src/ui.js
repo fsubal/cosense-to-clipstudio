@@ -101,6 +101,30 @@ const TAG_NAME = "ctcs-modal";
  * DOM から外れると自動的に keydown リスナーも外れる
  */
 export class ClipStudioExportModal extends HTMLElement {
+  static {
+    if (!customElements.get(TAG_NAME)) {
+      customElements.define(TAG_NAME, this);
+    }
+  }
+
+  /**
+   * モーダルを生成して document.body に追加する
+   *
+   * @param {import("./types.js").ParseResult} result
+   * @param {import("./types.js").ManifestOptions} [options]
+   * @returns {ClipStudioExportModal}
+   */
+  static openModal(result, options = {}) {
+    const modal = /** @type {ClipStudioExportModal} */ (
+      document.createElement(TAG_NAME)
+    );
+
+    modal.result = result;
+    modal.options = options;
+    document.body.appendChild(modal);
+    return modal;
+  }
+
   /** @type {import("./types.js").ParseResult} */
   #result = { pages: [], warnings: [] };
 
@@ -184,8 +208,11 @@ export class ClipStudioExportModal extends HTMLElement {
     status.setAttribute("role", "status");
     copyJSON.addEventListener("click", async () => {
       const ok = await copyText(manifestJSON);
-      status.textContent = ok ? "作品全体のJSONをコピーしました ✓" : "コピーに失敗しました。JSONを書き出して利用してください";
+      status.textContent = ok
+        ? "作品全体のJSONをコピーしました ✓"
+        : "コピーに失敗しました。JSONを書き出して利用してください";
     });
+
     const downloadJSON = el("button");
     downloadJSON.textContent = "Computer Use用JSONを書き出す";
     downloadJSON.addEventListener("click", () => {
@@ -193,7 +220,8 @@ export class ClipStudioExportModal extends HTMLElement {
         downloadManifest(manifestJSON);
         status.textContent = "作品全体のJSONの書き出しを開始しました";
       } catch {
-        status.textContent = "書き出しに失敗しました。JSONコピーをお試しください";
+        status.textContent =
+          "書き出しに失敗しました。JSONコピーをお試しください";
       }
     });
     exportBar.append(copyJSON, downloadJSON, status);
@@ -279,25 +307,6 @@ export class ClipStudioExportModal extends HTMLElement {
     footer.append(prev, position, copy, next);
     dialog.appendChild(footer);
   }
-}
-
-if (!customElements.get(TAG_NAME)) {
-  customElements.define(TAG_NAME, ClipStudioExportModal);
-}
-
-/**
- * モーダルを生成して document.body に追加する
- *
- * @param {import("./types.js").ParseResult} result
- * @param {import("./types.js").ManifestOptions} [options]
- * @returns {ClipStudioExportModal}
- */
-export function openModal(result, options = {}) {
-  const modal = /** @type {ClipStudioExportModal} */ (document.createElement(TAG_NAME));
-  modal.result = result;
-  modal.options = options;
-  document.body.appendChild(modal);
-  return modal;
 }
 
 /**

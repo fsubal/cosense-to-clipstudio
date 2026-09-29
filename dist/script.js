@@ -309,6 +309,28 @@
 `;
   var TAG_NAME = "ctcs-modal";
   var ClipStudioExportModal = class extends HTMLElement {
+    static {
+      if (!customElements.get(TAG_NAME)) {
+        customElements.define(TAG_NAME, this);
+      }
+    }
+    /**
+     * モーダルを生成して document.body に追加する
+     *
+     * @param {import("./types.js").ParseResult} result
+     * @param {import("./types.js").ManifestOptions} [options]
+     * @returns {ClipStudioExportModal}
+     */
+    static openModal(result, options = {}) {
+      const modal = (
+        /** @type {ClipStudioExportModal} */
+        document.createElement(TAG_NAME)
+      );
+      modal.result = result;
+      modal.options = options;
+      document.body.appendChild(modal);
+      return modal;
+    }
     /** @type {import("./types.js").ParseResult} */
     #result = { pages: [], warnings: [] };
     /** @type {import("./types.js").ManifestOptions} */
@@ -459,19 +481,6 @@
       dialog.appendChild(footer);
     }
   };
-  if (!customElements.get(TAG_NAME)) {
-    customElements.define(TAG_NAME, ClipStudioExportModal);
-  }
-  function openModal(result, options = {}) {
-    const modal = (
-      /** @type {ClipStudioExportModal} */
-      document.createElement(TAG_NAME)
-    );
-    modal.result = result;
-    modal.options = options;
-    document.body.appendChild(modal);
-    return modal;
-  }
   async function copyText(text) {
     try {
       await navigator.clipboard.writeText(text);
@@ -543,7 +552,7 @@
           return;
         }
         const result = parsePlot(cosensePage.toPlotLines());
-        openModal(result, {
+        ClipStudioExportModal.openModal(result, {
           source: {
             title: cosensePage.lines[0]?.text,
             url: window.location.href
