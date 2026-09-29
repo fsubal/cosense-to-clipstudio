@@ -110,6 +110,13 @@ npm run build   # src/ を dist/script.js にバンドル (esbuild)
   「window.cosenseとwindow.scrapboxのどちらでもUserScriptが使えるようにする」）
 - `scrapbox.PageMenu.addMenu({ title, image, onClick })` でボタンを追加します
   （[scrapboxlab/Page Menuにボタンを追加する](https://scrapbox.io/scrapboxlab/Page_Menuにボタンを追加する)）
+- モーダルはカスタム要素 `<ctcs-modal>`（`src/ui.js` の `ClipStudioExportModal`）です。
+  `result` / `options` プロパティで表示内容を受け取り、`openModal()` は要素を作って
+  `document.body` に追加するだけの薄い関数です。DOM から外れると keydown リスナーも自動で外れます
+- モーダルの中身は Shadow DOM（`attachShadow({ mode: "open" })`）に描画し、スタイルもその中の
+  `<style>` に入れています。Cosense のグローバル CSS（`button` や `ul` などの要素セレクタ）が
+  モーダルに当たらず、逆にモーダルの CSS が Cosense 側に漏れません。
+  `:host { all: initial }` でフォントや色の継承も遮断し、必要なものは `.ctcs-dialog` で明示しています
 - [@progfay/scrapbox-parser](https://github.com/progfay/scrapbox-parser) は
   使っていません。行全体の括弧種別とインデントしか見ないため、
   構文木パーサーは不要と判断しました

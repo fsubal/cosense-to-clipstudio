@@ -1,6 +1,8 @@
 /**
  * 解析結果をページ送りできるモーダルとして表示する。
- * DOM にのみ依存し、window.cosense には依存しない
+ * DOM にのみ依存し、window.cosense には依存しない。
+ * モーダルはカスタム要素 `<ctcs-modal>` で、Cosense のグローバル CSS と
+ * 衝突しないよう Shadow DOM の中に描画する
  */
 
 import { formatPage, formatManifest } from "./format.js";
@@ -12,22 +14,30 @@ const KIND_LABELS = {
   monologue: "モノローグ",
 };
 
-const STYLE_ID = "ctcs-style";
+/**
+ * Shadow DOM の中だけに適用されるスタイル。
+ * `:host { all: initial }` で外側から継承されるフォントや色も遮断し、
+ * 必要なものは .ctcs-dialog で明示的に指定する
+ */
 const CSS = `
+:host { all: initial; }
 .ctcs-overlay {
   position: fixed; inset: 0; z-index: 10000;
   background: rgba(0, 0, 0, 0.5);
   display: flex; align-items: center; justify-content: center;
 }
-.ctcs-modal {
+.ctcs-dialog {
   background: #fff; color: #222;
   width: min(560px, calc(100vw - 32px));
   max-height: calc(100vh - 64px);
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   display: flex; flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Hiragino Sans", "Noto Sans JP", sans-serif;
   font-size: 14px; line-height: 1.6;
+  box-sizing: border-box;
 }
+.ctcs-dialog *, .ctcs-dialog *::before, .ctcs-dialog *::after { box-sizing: inherit; }
 .ctcs-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 16px; border-bottom: 1px solid #ddd;
@@ -83,44 +93,89 @@ const CSS = `
 .ctcs-position { color: #666; font-size: 12px; }
 `;
 
+const TAG_NAME = "ctcs-modal";
+
 /**
- * @param {import("./types.js").ParseResult} result
- * @param {import("./types.js").ManifestOptions} [options]
+ * 解析結果を表示するモーダル本体のカスタム要素 `<ctcs-modal>`。
+ * Shadow DOM の中にスタイルと UI を持ち、`result` / `options` プロパティで表示内容を受け取る。
+ * DOM から外れると自動的に keydown リスナーも外れる
  */
-export function openModal(result, options = {}) {
-  injectStyle();
+export class ClipStudioExportModal extends HTMLElement {
+  /** @type {import("./types.js").ParseResult} */
+  #result = { pages: [], warnings: [] };
 
-  const manifestJSON = formatManifest(result, options);
-  let index = 0;
+  /** @type {import("./types.js").ManifestOptions} */
+  #options = {};
+  #index = 0;
+  #dialog = el("div", "ctcs-dialog");
 
-  const overlay = el("div", "ctcs-overlay");
-  const modal = el("div", "ctcs-modal");
-  overlay.appendChild(modal);
-
-  const close = () => {
-    overlay.remove();
-    document.removeEventListener("keydown", onKeydown);
-  };
   /** @param {KeyboardEvent} event */
-  const onKeydown = (event) => {
-    if (event.key === "Escape") close();
+  #onKeydown = (event) => {
+    if (event.key === "Escape") this.close();
   };
-  document.addEventListener("keydown", onKeydown);
-  overlay.addEventListener("click", (event) => {
-    if (event.target === overlay) close();
-  });
 
-  const render = () => {
-    modal.replaceChildren();
+  constructor() {
+    super();
+    const shadow = this.attachShadow({ mode: "open" });
+    const style = document.createElement("style");
+    style.textContent = CSS;
+    const overlay = el("div", "ctcs-overlay");
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) this.close();
+    });
+    overlay.appendChild(this.#dialog);
+    shadow.append(style, overlay);
+  }
+
+  get result() {
+    return this.#result;
+  }
+
+  /** @param {import("./types.js").ParseResult} value */
+  set result(value) {
+    this.#result = value;
+    this.#index = 0;
+    if (this.isConnected) this.#render();
+  }
+
+  get options() {
+    return this.#options;
+  }
+
+  /** @param {import("./types.js").ManifestOptions} value */
+  set options(value) {
+    this.#options = value;
+    if (this.isConnected) this.#render();
+  }
+
+  connectedCallback() {
+    document.addEventListener("keydown", this.#onKeydown);
+    this.#render();
+  }
+
+  disconnectedCallback() {
+    document.removeEventListener("keydown", this.#onKeydown);
+  }
+
+  /** モーダルを閉じる（DOM から取り除く） */
+  close() {
+    this.remove();
+  }
+
+  #render() {
+    const result = this.#result;
+    const manifestJSON = formatManifest(result, this.#options);
+    const dialog = this.#dialog;
+    dialog.replaceChildren();
 
     const header = el("div", "ctcs-header");
     const title = el("h2");
     title.textContent = "CLIPSTUDIO用に出力";
     const closeButton = el("button", "ctcs-close");
     closeButton.textContent = "×";
-    closeButton.addEventListener("click", close);
+    closeButton.addEventListener("click", () => this.close());
     header.append(title, closeButton);
-    modal.appendChild(header);
+    dialog.appendChild(header);
 
     const exportBar = el("div", "ctcs-footer");
     const copyJSON = el("button");
@@ -142,10 +197,10 @@ export function openModal(result, options = {}) {
       }
     });
     exportBar.append(copyJSON, downloadJSON, status);
-    modal.appendChild(exportBar);
+    dialog.appendChild(exportBar);
 
     const body = el("div", "ctcs-body");
-    modal.appendChild(body);
+    dialog.appendChild(body);
 
     if (result.pages.length === 0) {
       const empty = el("p", "ctcs-empty");
@@ -156,7 +211,7 @@ export function openModal(result, options = {}) {
       return;
     }
 
-    const page = result.pages[index];
+    const page = result.pages[this.#index];
 
     const pageTitle = el("h3", "ctcs-page-title");
     const range =
@@ -193,14 +248,14 @@ export function openModal(result, options = {}) {
 
     const prev = el("button");
     prev.textContent = "← 前ページ";
-    prev.disabled = index === 0;
+    prev.disabled = this.#index === 0;
     prev.addEventListener("click", () => {
-      index -= 1;
-      render();
+      this.#index -= 1;
+      this.#render();
     });
 
     const position = el("span", "ctcs-position");
-    position.textContent = `${index + 1} / ${result.pages.length}`;
+    position.textContent = `${this.#index + 1} / ${result.pages.length}`;
 
     const copy = el("button", "ctcs-copy");
     copy.textContent = "このページをコピー";
@@ -215,18 +270,34 @@ export function openModal(result, options = {}) {
 
     const next = el("button");
     next.textContent = "次ページ →";
-    next.disabled = index === result.pages.length - 1;
+    next.disabled = this.#index === result.pages.length - 1;
     next.addEventListener("click", () => {
-      index += 1;
-      render();
+      this.#index += 1;
+      this.#render();
     });
 
     footer.append(prev, position, copy, next);
-    modal.appendChild(footer);
-  };
+    dialog.appendChild(footer);
+  }
+}
 
-  render();
-  document.body.appendChild(overlay);
+if (!customElements.get(TAG_NAME)) {
+  customElements.define(TAG_NAME, ClipStudioExportModal);
+}
+
+/**
+ * モーダルを生成して document.body に追加する
+ *
+ * @param {import("./types.js").ParseResult} result
+ * @param {import("./types.js").ManifestOptions} [options]
+ * @returns {ClipStudioExportModal}
+ */
+export function openModal(result, options = {}) {
+  const modal = /** @type {ClipStudioExportModal} */ (document.createElement(TAG_NAME));
+  modal.result = result;
+  modal.options = options;
+  document.body.appendChild(modal);
+  return modal;
 }
 
 /**
@@ -298,14 +369,6 @@ function el(tag, className) {
   const element = document.createElement(tag);
   if (className) element.className = className;
   return element;
-}
-
-function injectStyle() {
-  if (document.getElementById(STYLE_ID)) return;
-  const style = document.createElement("style");
-  style.id = STYLE_ID;
-  style.textContent = CSS;
-  document.head.appendChild(style);
 }
 
 /** @param {string} json */

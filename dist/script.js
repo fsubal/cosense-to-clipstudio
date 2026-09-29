@@ -234,22 +234,25 @@
     narration: "\u30CA\u30EC\u30FC\u30B7\u30E7\u30F3",
     monologue: "\u30E2\u30CE\u30ED\u30FC\u30B0"
   };
-  var STYLE_ID = "ctcs-style";
   var CSS = `
+:host { all: initial; }
 .ctcs-overlay {
   position: fixed; inset: 0; z-index: 10000;
   background: rgba(0, 0, 0, 0.5);
   display: flex; align-items: center; justify-content: center;
 }
-.ctcs-modal {
+.ctcs-dialog {
   background: #fff; color: #222;
   width: min(560px, calc(100vw - 32px));
   max-height: calc(100vh - 64px);
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   display: flex; flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Hiragino Sans", "Noto Sans JP", sans-serif;
   font-size: 14px; line-height: 1.6;
+  box-sizing: border-box;
 }
+.ctcs-dialog *, .ctcs-dialog *::before, .ctcs-dialog *::after { box-sizing: inherit; }
 .ctcs-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 16px; border-bottom: 1px solid #ddd;
@@ -304,34 +307,71 @@
 .ctcs-copy { border-color: #1976d2 !important; background: #1976d2 !important; color: #fff; }
 .ctcs-position { color: #666; font-size: 12px; }
 `;
-  function openModal(result, options = {}) {
-    injectStyle();
-    const manifestJSON = formatManifest(result, options);
-    let index = 0;
-    const overlay = el("div", "ctcs-overlay");
-    const modal = el("div", "ctcs-modal");
-    overlay.appendChild(modal);
-    const close = () => {
-      overlay.remove();
-      document.removeEventListener("keydown", onKeydown);
+  var TAG_NAME = "ctcs-modal";
+  var ClipStudioExportModal = class extends HTMLElement {
+    /** @type {import("./types.js").ParseResult} */
+    #result = { pages: [], warnings: [] };
+    /** @type {import("./types.js").ManifestOptions} */
+    #options = {};
+    #index = 0;
+    #dialog = el("div", "ctcs-dialog");
+    /** @param {KeyboardEvent} event */
+    #onKeydown = (event) => {
+      if (event.key === "Escape") this.close();
     };
-    const onKeydown = (event) => {
-      if (event.key === "Escape") close();
-    };
-    document.addEventListener("keydown", onKeydown);
-    overlay.addEventListener("click", (event) => {
-      if (event.target === overlay) close();
-    });
-    const render = () => {
-      modal.replaceChildren();
+    constructor() {
+      super();
+      const shadow = this.attachShadow({ mode: "open" });
+      const style = document.createElement("style");
+      style.textContent = CSS;
+      const overlay = el("div", "ctcs-overlay");
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) this.close();
+      });
+      overlay.appendChild(this.#dialog);
+      shadow.append(style, overlay);
+    }
+    get result() {
+      return this.#result;
+    }
+    /** @param {import("./types.js").ParseResult} value */
+    set result(value) {
+      this.#result = value;
+      this.#index = 0;
+      if (this.isConnected) this.#render();
+    }
+    get options() {
+      return this.#options;
+    }
+    /** @param {import("./types.js").ManifestOptions} value */
+    set options(value) {
+      this.#options = value;
+      if (this.isConnected) this.#render();
+    }
+    connectedCallback() {
+      document.addEventListener("keydown", this.#onKeydown);
+      this.#render();
+    }
+    disconnectedCallback() {
+      document.removeEventListener("keydown", this.#onKeydown);
+    }
+    /** モーダルを閉じる（DOM から取り除く） */
+    close() {
+      this.remove();
+    }
+    #render() {
+      const result = this.#result;
+      const manifestJSON = formatManifest(result, this.#options);
+      const dialog = this.#dialog;
+      dialog.replaceChildren();
       const header = el("div", "ctcs-header");
       const title = el("h2");
       title.textContent = "CLIPSTUDIO\u7528\u306B\u51FA\u529B";
       const closeButton = el("button", "ctcs-close");
       closeButton.textContent = "\xD7";
-      closeButton.addEventListener("click", close);
+      closeButton.addEventListener("click", () => this.close());
       header.append(title, closeButton);
-      modal.appendChild(header);
+      dialog.appendChild(header);
       const exportBar = el("div", "ctcs-footer");
       const copyJSON = el("button");
       copyJSON.textContent = "Computer Use\u7528JSON\u3092\u30B3\u30D4\u30FC";
@@ -352,9 +392,9 @@
         }
       });
       exportBar.append(copyJSON, downloadJSON, status);
-      modal.appendChild(exportBar);
+      dialog.appendChild(exportBar);
       const body = el("div", "ctcs-body");
-      modal.appendChild(body);
+      dialog.appendChild(body);
       if (result.pages.length === 0) {
         const empty = el("p", "ctcs-empty");
         empty.textContent = "\u30DA\u30FC\u30B8\u898B\u51FA\u3057\uFF08\u30A4\u30F3\u30C7\u30F3\u30C80\u306E\u300C1.\u300D\u300C2.\u300D\u2026\uFF09\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F";
@@ -362,7 +402,7 @@
         appendWarnings(body, result.warnings);
         return;
       }
-      const page = result.pages[index];
+      const page = result.pages[this.#index];
       const pageTitle = el("h3", "ctcs-page-title");
       const range = page.endNumber > page.number ? `${page.number}-${page.endNumber}\u30DA\u30FC\u30B8\u76EE\uFF08\u898B\u958B\u304D\uFF09` : `${page.number}\u30DA\u30FC\u30B8\u76EE`;
       pageTitle.textContent = page.label ? `${range} \u2014 ${page.label}` : range;
@@ -391,13 +431,13 @@
       const footer = el("div", "ctcs-footer");
       const prev = el("button");
       prev.textContent = "\u2190 \u524D\u30DA\u30FC\u30B8";
-      prev.disabled = index === 0;
+      prev.disabled = this.#index === 0;
       prev.addEventListener("click", () => {
-        index -= 1;
-        render();
+        this.#index -= 1;
+        this.#render();
       });
       const position = el("span", "ctcs-position");
-      position.textContent = `${index + 1} / ${result.pages.length}`;
+      position.textContent = `${this.#index + 1} / ${result.pages.length}`;
       const copy = el("button", "ctcs-copy");
       copy.textContent = "\u3053\u306E\u30DA\u30FC\u30B8\u3092\u30B3\u30D4\u30FC";
       copy.disabled = page.items.length === 0;
@@ -410,16 +450,27 @@
       });
       const next = el("button");
       next.textContent = "\u6B21\u30DA\u30FC\u30B8 \u2192";
-      next.disabled = index === result.pages.length - 1;
+      next.disabled = this.#index === result.pages.length - 1;
       next.addEventListener("click", () => {
-        index += 1;
-        render();
+        this.#index += 1;
+        this.#render();
       });
       footer.append(prev, position, copy, next);
-      modal.appendChild(footer);
-    };
-    render();
-    document.body.appendChild(overlay);
+      dialog.appendChild(footer);
+    }
+  };
+  if (!customElements.get(TAG_NAME)) {
+    customElements.define(TAG_NAME, ClipStudioExportModal);
+  }
+  function openModal(result, options = {}) {
+    const modal = (
+      /** @type {ClipStudioExportModal} */
+      document.createElement(TAG_NAME)
+    );
+    modal.result = result;
+    modal.options = options;
+    document.body.appendChild(modal);
+    return modal;
   }
   async function copyText(text) {
     try {
@@ -461,13 +512,6 @@
     const element = document.createElement(tag);
     if (className) element.className = className;
     return element;
-  }
-  function injectStyle() {
-    if (document.getElementById(STYLE_ID)) return;
-    const style = document.createElement("style");
-    style.id = STYLE_ID;
-    style.textContent = CSS;
-    document.head.appendChild(style);
   }
   function downloadManifest(json) {
     const blob = new Blob([json], { type: "application/json;charset=utf-8" });
