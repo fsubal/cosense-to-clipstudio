@@ -188,10 +188,34 @@ export class ClipStudioExportModal extends HTMLElement {
 
   #render() {
     const result = this.#result;
-    const manifestJSON = formatManifest(result, this.#options);
     const dialog = this.#dialog;
     dialog.replaceChildren();
 
+    this.#renderHeader(dialog);
+    this.#renderExportBar(dialog, result);
+
+    const body = el("div", "ctcs-body");
+    dialog.appendChild(body);
+
+    if (result.pages.length === 0) {
+      const empty = el("p", "ctcs-empty");
+      empty.textContent =
+        "ページ見出し（インデント0の「1.」「2.」…）が見つかりませんでした";
+      body.appendChild(empty);
+      appendWarnings(body, result.warnings);
+      return;
+    }
+
+    const page = result.pages[this.#index];
+    this.#renderPageTitle(body, page);
+    this.#renderPageContent(body, result, page);
+    this.#renderFooter(dialog, result, page);
+  }
+
+  /**
+   * @param {HTMLDivElement} dialog 
+   */
+  #renderHeader(dialog) {
     const header = el("div", "ctcs-header");
     const title = el("h2");
     title.textContent = "CLIPSTUDIO用に出力";
@@ -200,7 +224,14 @@ export class ClipStudioExportModal extends HTMLElement {
     closeButton.addEventListener("click", () => this.close());
     header.append(title, closeButton);
     dialog.appendChild(header);
+  }
 
+  /**
+   * @param {HTMLDivElement} dialog 
+   * @param {import("./types.js").ParseResult} result 
+   */
+  #renderExportBar(dialog, result) {
+    const manifestJSON = formatManifest(result, this.#options);
     const exportBar = el("div", "ctcs-footer");
     const copyJSON = el("button");
     copyJSON.textContent = "Computer Use用JSONをコピー";
@@ -226,21 +257,13 @@ export class ClipStudioExportModal extends HTMLElement {
     });
     exportBar.append(copyJSON, downloadJSON, status);
     dialog.appendChild(exportBar);
+  }
 
-    const body = el("div", "ctcs-body");
-    dialog.appendChild(body);
-
-    if (result.pages.length === 0) {
-      const empty = el("p", "ctcs-empty");
-      empty.textContent =
-        "ページ見出し（インデント0の「1.」「2.」…）が見つかりませんでした";
-      body.appendChild(empty);
-      appendWarnings(body, result.warnings);
-      return;
-    }
-
-    const page = result.pages[this.#index];
-
+  /**
+   * @param {HTMLDivElement} body 
+   * @param {import("./types.js").PlotPage} page 
+   */
+  #renderPageTitle(body, page) {
     const pageTitle = el("h3", "ctcs-page-title");
     const range =
       page.endNumber > page.number
@@ -248,7 +271,14 @@ export class ClipStudioExportModal extends HTMLElement {
         : `${page.number}ページ目`;
     pageTitle.textContent = page.label ? `${range} — ${page.label}` : range;
     body.appendChild(pageTitle);
+  }
 
+  /**
+   * @param {HTMLDivElement} body 
+   * @param {import("./types.js").ParseResult} result 
+   * @param {import("./types.js").PlotPage} page 
+   */
+  #renderPageContent(body, result, page) {
     appendWarnings(body, [...result.warnings, ...page.warnings]);
     appendNotes(body, page.notes);
 
@@ -257,21 +287,36 @@ export class ClipStudioExportModal extends HTMLElement {
       empty.textContent = "抽出項目はありません（0件）";
       body.appendChild(empty);
     } else {
-      const list = el("ul", "ctcs-items");
-      for (const item of page.items) {
-        const li = el("li");
-        li.dataset.kind = item.kind;
-        const kind = el("span", "ctcs-kind");
-        kind.dataset.kind = item.kind;
-        kind.textContent = KIND_LABELS[item.kind];
-        const text = el("span", "ctcs-text");
-        text.textContent = item.text;
-        li.append(kind, text);
-        list.appendChild(li);
-      }
-      body.appendChild(list);
+      this.#renderItemsList(body, page);
     }
+  }
 
+  /**
+   * @param {HTMLDivElement} body 
+   * @param {import("./types.js").PlotPage} page 
+   */
+  #renderItemsList(body, page) {
+    const list = el("ul", "ctcs-items");
+    for (const item of page.items) {
+      const li = el("li");
+      li.dataset.kind = item.kind;
+      const kind = el("span", "ctcs-kind");
+      kind.dataset.kind = item.kind;
+      kind.textContent = KIND_LABELS[item.kind];
+      const text = el("span", "ctcs-text");
+      text.textContent = item.text;
+      li.append(kind, text);
+      list.appendChild(li);
+    }
+    body.appendChild(list);
+  }
+
+  /**
+   * @param {HTMLDivElement} dialog 
+   * @param {import("./types.js").ParseResult} result 
+   * @param {import("./types.js").PlotPage} page 
+   */
+  #renderFooter(dialog, result, page) {
     const footer = el("div", "ctcs-footer");
 
     const prev = el("button");
