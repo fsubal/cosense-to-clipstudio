@@ -163,7 +163,7 @@ npm run build   # src/ を dist/script.js にバンドル (esbuild)
 - CLIP STUDIO PAINT EX ストーリーエディターが空行区切りテキストを
   複数項目として取り込む挙動
 
-## Computer Use連携（Mac版CSPは未検証）
+## Computer Use連携
 
 Cosenseの現在のプロットページを1作品として、全ページの中間表現（manifest）をJSONで出力します。
 Mac版CSPの起動・作品作成・テキスト投入を行う機能ではありません。
@@ -253,5 +253,28 @@ const json = formatManifest(result, {
 
 単体テストは種別・元行番号・警告・情報・空ページ・番号・見開きの範囲の保持、JSONの往復、
 任意設定と既存のページ単位テキスト出力を確認します。
-実際のCosense上での新ボタンの操作・ダウンロード・Universal Clipboard、
-およびMac版CSPへの投入は未検証です。
+2026年9月にMac版EX 5.1.4で、CosenseからのJSONダウンロードと6ページ・6項目の
+原稿作成・独立文字レイヤーへの入力・保存を部分検証しました。本文の再出力照合は未完了です。
+Universal Clipboardと他環境での動作、無人の通し実行はこの検証に含みません。
+
+## 配布用エージェントスキル
+
+[skills/cosense-to-csp/SKILL.md](skills/cosense-to-csp/SKILL.md) は、manifestから
+Mac版CLIP STUDIO PAINT EXの原稿を作るComputer Use用の手順です。
+UserScriptとは別の配布物であり、`script.js`への組み込みやCSPの自動起動機能はありません。
+
+- スキルを取得するには本リポジトリをcloneするか、ソースアーカイブから
+  `skills/cosense-to-csp/` をフォルダごと取り出してください。既存Releaseの`script.js`には含まれません。
+- まずはエージェントに、取得した`SKILL.md`の絶対パスとmanifest、作品名、保存先、原稿設定を渡して利用できます。
+- スキルとして登録する場合は、利用するエージェントのスキル配置先へ`cosense-to-csp`フォルダ全体を配置してください。
+  `references/`も必要です。登録方法・検出場所は実行環境に従ってください。
+- dotsから使う場合はCSPのあるMacを接続し、実行タスクへスキルの場所と作品設定を渡してください。
+  クラウドだけでMac上のCSPを操作できるとは仮定しません。
+
+通常手順は1項目1文字レイヤー、コマ枠の外の「テキスト」フォルダへの収納です。
+集英社・右綴じ・三段枠は[検証済み設定例](skills/cosense-to-csp/references/verified-profile.md)として分離しています。
+保存先、作品名、フォント、ローカルのリポジトリ位置は各利用者が指定します。
+原稿や実行記録はスキル配布フォルダとは別に保存してください。
+
+スキルは手順書であり、全環境での自動操作を保証するものではありません。
+検証範囲と既知の入力・ダイアログ問題は付属の参照文書を確認してください。
