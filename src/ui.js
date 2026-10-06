@@ -5,7 +5,7 @@
  * 衝突しないよう Shadow DOM の中に描画する
  */
 
-import { formatPage, formatManifest } from "./format.js";
+import { formatPage, formatManifest, toFullWidthAlnum } from "./format.js";
 
 /** @type {Record<import("./types.js").TextKind, string>} */
 const KIND_LABELS = {
@@ -91,6 +91,11 @@ const CSS = `
 .ctcs-footer button:disabled { opacity: 0.4; cursor: default; }
 .ctcs-copy { border-color: #1976d2 !important; background: #1976d2 !important; color: #fff; }
 .ctcs-position { color: #666; font-size: 12px; }
+.ctcs-option {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; color: #333; cursor: pointer; user-select: none;
+}
+.ctcs-option input { margin: 0; cursor: pointer; }
 `;
 
 const TAG_NAME = "ctcs-modal";
@@ -127,6 +132,9 @@ export class ClipStudioExportModal extends HTMLElement {
 
   /** @type {import("./types.js").ParseResult} */
   #result = { pages: [], warnings: [] };
+
+  /** 半角英数字を全角にして出力するか。縦書きのセリフ向けに既定でオン */
+  #fullWidth = true;
 
   /** @type {import("./types.js").ManifestOptions} */
   #options = {};
@@ -169,6 +177,7 @@ export class ClipStudioExportModal extends HTMLElement {
   /** @param {import("./types.js").ManifestOptions} value */
   set options(value) {
     this.#options = value;
+    if (value.fullWidth !== undefined) this.#fullWidth = value.fullWidth;
     if (this.isConnected) this.#render();
   }
 
@@ -184,6 +193,11 @@ export class ClipStudioExportModal extends HTMLElement {
   /** モーダルを閉じる（DOM から取り除く） */
   close() {
     this.remove();
+  }
+
+  /** 呼び出し元のオプションにチェックボックスの状態を重ねた出力オプション */
+  #formatOptions() {
+    return { ...this.#options, fullWidth: this.#fullWidth };
   }
 
   #render() {
@@ -231,8 +245,18 @@ export class ClipStudioExportModal extends HTMLElement {
    * @param {import("./types.js").ParseResult} result 
    */
   #renderExportBar(dialog, result) {
-    const manifestJSON = formatManifest(result, this.#options);
+    const manifestJSON = formatManifest(result, this.#formatOptions());
     const exportBar = el("div", "ctcs-footer");
+
+    const option = el("label", "ctcs-option");
+    const fullWidth = el("input");
+    fullWidth.type = "checkbox";
+    fullWidth.checked = this.#fullWidth;
+    fullWidth.addEventListener("change", () => {
+      this.#fullWidth = fullWidth.checked;
+      this.#render();
+    });
+    option.append(fullWidth, document.createTextNode("半角英数字を全角にする"));
     const copyJSON = el("button");
     copyJSON.textContent = "Computer Use用JSONをコピー";
     const status = el("span", "ctcs-position");
@@ -255,7 +279,7 @@ export class ClipStudioExportModal extends HTMLElement {
           "書き出しに失敗しました。JSONコピーをお試しください";
       }
     });
-    exportBar.append(copyJSON, downloadJSON, status);
+    exportBar.append(option, copyJSON, downloadJSON, status);
     dialog.appendChild(exportBar);
   }
 
@@ -304,7 +328,7 @@ export class ClipStudioExportModal extends HTMLElement {
       kind.dataset.kind = item.kind;
       kind.textContent = KIND_LABELS[item.kind];
       const text = el("span", "ctcs-text");
-      text.textContent = item.text;
+      text.textContent = this.#fullWidth ? toFullWidthAlnum(item.text) : item.text;
       li.append(kind, text);
       list.appendChild(li);
     }
@@ -334,7 +358,7 @@ export class ClipStudioExportModal extends HTMLElement {
     copy.textContent = "このページをコピー";
     copy.disabled = page.items.length === 0;
     copy.addEventListener("click", async () => {
-      const ok = await copyText(formatPage(page));
+      const ok = await copyText(formatPage(page, this.#formatOptions()));
       copy.textContent = ok ? "コピーしました ✓" : "コピーに失敗しました";
       setTimeout(() => {
         copy.textContent = "このページをコピー";

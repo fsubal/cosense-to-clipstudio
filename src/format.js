@@ -5,15 +5,40 @@
  */
 
 /**
+ * 半角英数字（0-9 A-Z a-z）を全角に置き換える。
+ * 漫画のセリフは縦書きが普通で、縦書きでは英数字も全角にすることが多いため。
+ * 記号・空白・すでに全角の文字はそのまま。二桁数字の縦中横は扱わない
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+export function toFullWidthAlnum(text) {
+  return text.replace(/[0-9A-Za-z]/g, (char) =>
+    String.fromCharCode(char.charCodeAt(0) + 0xfee0),
+  );
+}
+
+/**
+ * @param {string} text
+ * @param {import("./types.js").FormatOptions} options
+ * @returns {string}
+ */
+function transformText(text, options) {
+  return options.fullWidth ? toFullWidthAlnum(text) : text;
+}
+
+/**
  * @param {import("./types.js").PlotPage} page
+ * @param {import("./types.js").FormatOptions} [options]
  * @returns {string} クリップボードへ入れるテキスト
  */
-export function formatPage(page) {
-  return page.items.map((item) => item.text).join("\n\n");
+export function formatPage(page, options = {}) {
+  return page.items.map((item) => transformText(item.text, options)).join("\n\n");
 }
 
 /**
  * Computer Use向けの中間表現。番号・順序・警告を補正せず保持する。
+ * `options.fullWidth` のときだけ本文の半角英数字を全角にし、トップレベルに `fullWidth: true` を記録する。
  * 入力とは参照を共有しないスナップショットを返す。
  * @param {import("./types.js").ParseResult} result
  * @param {import("./types.js").ManifestOptions} [options]
@@ -29,11 +54,16 @@ export function createManifest(result, options = {}) {
       number: page.number,
       endNumber: page.endNumber,
       label: page.label,
-      items: page.items.map(({ kind, text, sourceLine }) => ({ kind, text, sourceLine })),
+      items: page.items.map(({ kind, text, sourceLine }) => ({
+        kind,
+        text: transformText(text, options),
+        sourceLine,
+      })),
       warnings: [...page.warnings],
       notes: [...page.notes],
     })),
     warnings: [...result.warnings],
+    ...(options.fullWidth ? { fullWidth: true } : {}),
     ...(options.documentSettings === undefined ? {} : {
       documentSettings: { ...options.documentSettings },
     }),

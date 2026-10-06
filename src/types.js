@@ -49,9 +49,16 @@ export {};
  */
 
 /**
+ * 本文テキストの出力オプション
+ * @typedef {object} FormatOptions
+ * @property {boolean} [fullWidth] 半角英数字を全角に置き換える（縦書き向け）
+ */
+
+/**
  * @typedef {object} ManifestOptions
  * @property {{title?: string, url?: string}} [source]
  * @property {DocumentSettings} [documentSettings]
+ * @property {boolean} [fullWidth] 本文の半角英数字を全角に置き換える。true のとき manifest にも `fullWidth: true` が入る
  */
 
 /**
@@ -62,5 +69,6 @@ export {};
  * @property {number} pageCount 抽出したページの個数。最大ページ番号ではない
  * @property {PlotPage[]} pages
  * @property {string[]} warnings 特定のページに紐づかない警告
+ * @property {true} [fullWidth] 本文の半角英数字を全角化済みであることを示す（オプション指定時のみ）
  * @property {DocumentSettings} [documentSettings]
  */
