@@ -21,6 +21,7 @@ description: Cosenseの漫画プロットURLまたはcosense-to-clipstudioのman
 3. `schema: cosense-to-clipstudio/manifest`、`version: 1` を確認する。`pageCount` はセクション数で物理ページ数ではない。各 `number` / `endNumber`（省略時はnumber）の範囲を検証し、連続したページ構成から物理ページ数を決める。
 4. `warnings` はページ別・全体の両方、`notes` は存在すれば読む。欠番、重複、逆順、範囲重複、見開き設定との不一致を勝手に補正しない。`documentSettings.pageCount` があれば物理ページ数と照合する。構成が決められなければ作成前に確認する。
 5. 番号、label、kind、text、sourceLine、warnings、notesを保持する。見開き項目は一度だけ配置し、空のitemsを持つページも保持する。先頭・末尾に白紙や表紙を自動追加しない。
+6. トップレベルに `fullWidth: true` があれば、本文の半角英数字（`0-9` `A-Z` `a-z`）はUserScript側で全角化済みなので、そのまま貼り付ける。無ければ本文は元のままで、全角化はユーザー指定がある場合だけ行う。どちらの場合も記号・空白・二桁数字の縦中横には手を加えない。
 
 ## 2. 原稿作成と文字入力
 
