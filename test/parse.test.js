@@ -385,3 +385,24 @@ test("見出し前の行は分割対象でも警告だけになる", () => {
   assert.equal(warnings.length, 1);
   assert.deepEqual(pages[0].notes, []);
 });
+
+test("見出し行の ID と区切り内の最大更新時刻を保持する", () => {
+  const { pages } = parsePlot([
+    { id: "h1", text: "1.", indent: 0, updated: 100 },
+    { id: "l1", text: "「セリフ」", indent: 1, updated: 300 },
+    { id: "c1", text: "[fsubal.icon] コメントの更新も含める", indent: 2, updated: 500 },
+    { id: "e1", text: "", indent: 1, updated: 400 },
+    { id: "h2", text: "2.", indent: 0, updated: 200 },
+    { id: "t1", text: "ト書き", indent: 1, updated: 150 },
+  ]);
+  assert.equal(pages[0].headingId, "h1");
+  assert.equal(pages[0].updated, 500);
+  assert.equal(pages[1].headingId, "h2");
+  assert.equal(pages[1].updated, 200);
+});
+
+test("ID や更新時刻が無い入力では headingId / updated を持たない", () => {
+  const { pages } = parsePlot([{ text: "1.", indent: 0 }, { text: "「セリフ」", indent: 1 }]);
+  assert.equal("headingId" in pages[0], false);
+  assert.equal("updated" in pages[0], false);
+});

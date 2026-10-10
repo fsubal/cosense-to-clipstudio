@@ -39,10 +39,22 @@ export class CosensePage {
   }
 
   /**
-   * @returns {{ text: string }[]}
+   * @returns {import("./types.js").CosenseLine[]}
    */
   get lines() {
     return this.#cosense.Page.lines;
+  }
+
+  /** @returns {string | undefined} */
+  get projectName() {
+    const name = this.#cosense.Project?.name;
+    return typeof name === "string" ? name : undefined;
+  }
+
+  /** @returns {string | undefined} */
+  get pageId() {
+    const id = this.#cosense.Page?.id;
+    return typeof id === "string" ? id : undefined;
   }
 
   /**
@@ -62,9 +74,10 @@ export class CosensePage {
 /**
  * cosense.Page.lines をパーサー入力（PlotLine[]）へ変換する。
  * 先頭の1行はページタイトルなので除外し、
- * sourceLine には元の行番号（タイトル行 = 0）を保持する
+ * sourceLine には元の行番号（タイトル行 = 0）を保持する。
+ * 行 ID と更新時刻はあればそのまま通す（変更の追跡に使う）
  *
- * @param {{ text: string }[]} rawLines
+ * @param {import("./types.js").CosenseLine[]} rawLines
  * @returns {import("./types.js").PlotLine[]}
  */
 export function toPlotLines(rawLines) {
@@ -74,6 +87,8 @@ export function toPlotLines(rawLines) {
       text: line.text.slice(indent),
       indent,
       sourceLine: index + 1,
+      ...(line.id === undefined ? {} : { id: line.id }),
+      ...(line.updated === undefined ? {} : { updated: line.updated }),
     };
   });
 }

@@ -44,16 +44,10 @@ export function parsePlot(lines) {
   lines.forEach((line, index) => {
     const sourceLine = line.sourceLine ?? index;
     const text = line.text.replace(STRIKETHROUGH_PATTERN, "").trim();
-    if (text === "") {
-      return;
-    }
-    if (AUTHOR_COMMENT_PATTERN.test(text)) {
-      return;
-    }
 
     const heading = line.indent === 0 ? text.match(PAGE_HEADING_PATTERN) : null;
     if (heading) {
-      const page = createPage(heading);
+      const page = createPage(heading, line);
       const numbers = pageNumbers(page);
 
       const duplicated = numbers.filter((number) => seenNumbers.has(number));
@@ -78,6 +72,17 @@ export function parsePlot(lines) {
       return;
     }
 
+    // 出力に関係ない行（空行・コメント・ト書き）でも、区切りの最終更新時刻には含める
+    if (currentPage) {
+      touch(currentPage, line.updated);
+    }
+    if (text === "") {
+      return;
+    }
+    if (AUTHOR_COMMENT_PATTERN.test(text)) {
+      return;
+    }
+
     if (!currentPage) {
       // ページ見出しより前の行。ト書きであっても構造の崩れなので知らせる
       warnings.push(`ページ見出しより前の行を無視しました: ${text}`);
@@ -98,9 +103,10 @@ export function parsePlot(lines) {
  * 見開き（`2-3.`）の範囲が不正なら警告を付けて開始ページだけの区切りとして扱う
  *
  * @param {RegExpMatchArray} heading
+ * @param {import("./types.js").PlotLine} line 見出し行（行 ID と更新時刻を引き継ぐ）
  * @returns {import("./types.js").PlotPage}
  */
-function createPage(heading) {
+function createPage(heading, line) {
   const number = Number(heading[1]);
   const label = heading[3] ?? "";
   /** @type {string[]} */
@@ -127,7 +133,22 @@ function createPage(heading) {
     }
   }
 
-  return { number, endNumber, label, items: [], warnings, notes: [] };
+  /** @type {import("./types.js").PlotPage} */
+  const page = { number, endNumber, label, items: [], warnings, notes: [] };
+  if (line.id !== undefined) page.headingId = line.id;
+  touch(page, line.updated);
+  return page;
+}
+
+/**
+ * 区切りの最終更新時刻を行の更新時刻で更新する（大きいほうを残す）
+ *
+ * @param {import("./types.js").PlotPage} page
+ * @param {number | undefined} updated
+ */
+function touch(page, updated) {
+  if (updated === undefined) return;
+  page.updated = Math.max(page.updated ?? 0, updated);
 }
 
 /**

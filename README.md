@@ -82,6 +82,12 @@ UserScript は自分にだけ有効です。プロジェクトの他のメンバ
    - 「半角英数字を全角にする」（既定でオン）を外すと、英数字を元のまま出力します。
      プレビュー・ページのコピー・Computer Use用JSONのすべてに同じ設定が効きます
 4. 「このページをコピー」でそのページのテキストがクリップボードに入る
+   - コピーした時点の本文がブラウザに記録され、ページ見出しのバッジが「反映済み」になります
+   - 次回以降、記録と今の本文を比べて「未コピー」「変更あり」「番号変更」を表示します。
+     「変更あり」のページでは、削除された項目が取り消し線、追加された項目が緑のボーダーで表示されます
+   - モーダル冒頭の概要に「前回コピー後に変更があるページ」などの一覧が出ます。
+     番号を押すとそのページへ移動できます。プロットから消えた区切りは「削除されたページ」に出ます
+   - 記録は同じブラウザの localStorage にだけ残ります。別のブラウザや端末には引き継がれません
 5. iPad 側の CLIP STUDIO PAINT EX でストーリーエディターを開き、貼り付ける
    - 初期版ではフォント情報はクリップボードに含めません（プレーンテキストのみ）
 
@@ -107,6 +113,8 @@ npm run build   # src/ を dist/script.js にバンドル (esbuild)
 | --- | --- |
 | `src/parse.js` | プロット解析（純粋関数） |
 | `src/format.js` | CSP 向けテキスト生成 |
+| `src/sync.js` | CSP への反映状態の追跡（コピー時点の本文との比較。純粋関数） |
+| `src/sync-store.js` | 反映状態の localStorage への保存 |
 | `src/cosense.js` | Cosense 依存部分（`cosense.Page.lines` → パーサー入力への変換） |
 | `src/ui.js` | モーダル UI |
 | `src/index.js` | エントリーポイント（Page Menu への登録） |
@@ -129,6 +137,13 @@ npm run build   # src/ を dist/script.js にバンドル (esbuild)
   `<style>` に入れています。Cosense のグローバル CSS（`button` や `ul` などの要素セレクタ）が
   モーダルに当たらず、逆にモーダルの CSS が Cosense 側に漏れません。
   `:host { all: initial }` でフォントや色の継承も遮断し、必要なものは `.ctcs-dialog` で明示しています
+- CSP への反映状態は、「このページをコピー」した時点の各項目の本文（全角化前）を
+  `cosense-to-clipstudio:sync:<プロジェクト名>/<ページID>` キーで localStorage に記録し、
+  次に開いたときの本文と最長共通部分列で比べています。区切りは見出し行の Cosense 行 ID で追跡するので、
+  ページ番号を振り直しても「番号変更」として区別できます
+  （`cosense.Page.lines` の各行は `id` / `text` / `userId` / `created` / `updated` を持ちます）。
+  Cosense の履歴 API（`/api/page-snapshots/...`）は非公開で、スナップショットが編集ごとではなく
+  「最後にコピーした時点」と対応づけられないため使っていません
 - [@progfay/scrapbox-parser](https://github.com/progfay/scrapbox-parser) は
   使っていません。行全体の括弧種別とインデントしか見ないため、
   構文木パーサーは不要と判断しました

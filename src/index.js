@@ -1,6 +1,7 @@
 import { CosensePage } from "./cosense.js";
 import { parsePlot } from "./parse.js";
 import { ClipStudioExportModal } from "./ui.js";
+import { createLocalSyncStore, syncStorageKey } from "./sync-store.js";
 
 const ICON =
   "data:image/svg+xml," +
@@ -20,12 +21,23 @@ function main() {
       }
       const result = parsePlot(cosensePage.toPlotLines());
 
-      ClipStudioExportModal.openModal(result, {
-        source: {
-          title: cosensePage.lines[0]?.text,
-          url: window.location.href,
+      // CSP への反映状態は、作品（Cosense ページ）ごとに localStorage へ記録する
+      const { projectName, pageId } = cosensePage;
+      const syncStore =
+        projectName && pageId
+          ? createLocalSyncStore(syncStorageKey(projectName, pageId))
+          : null;
+
+      ClipStudioExportModal.openModal(
+        result,
+        {
+          source: {
+            title: cosensePage.lines[0]?.text,
+            url: window.location.href,
+          },
         },
-      });
+        syncStore,
+      );
     },
   );
 }

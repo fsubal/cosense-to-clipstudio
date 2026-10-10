@@ -21,6 +21,17 @@
  * @property {PlotItem[]} items
  * @property {string[]} warnings このページに紐づく警告
  * @property {string[]} notes 構造の崩れではないが確認の目安になる情報（1行を複数項目に分割した、括弧の前の地の文を除外した、など）
+ * @property {string} [headingId] 見出し行の Cosense 行 ID。ページ番号を振り直しても同じ区切りを追跡するために使う
+ * @property {number} [updated] 見出し行と配下の行の更新時刻（Unix 秒）の最大値。入力に無ければ省略
+ */
+
+/**
+ * cosense.Page.lines の1行のうち、このスクリプトが使うフィールド
+ * （scrapbox-jp/types の BaseLine: id / text / userId / created / updated）
+ * @typedef {object} CosenseLine
+ * @property {string} text
+ * @property {string} [id]
+ * @property {number} [updated] Unix 秒
  */
 
 /**
@@ -30,6 +41,8 @@
  * @property {string} text インデントを除いた本文
  * @property {number} indent インデントの深さ
  * @property {number} [sourceLine] 元ページでの行番号。省略時は配列の添字
+ * @property {string} [id] Cosense の行 ID。編集をまたいで安定する
+ * @property {number} [updated] 行の最終更新時刻（Unix 秒）
  */
 
 /**
@@ -71,4 +84,46 @@ export {};
  * @property {string[]} warnings 特定のページに紐づかない警告
  * @property {true} [fullWidth] 本文の半角英数字を全角化済みであることを示す（オプション指定時のみ）
  * @property {DocumentSettings} [documentSettings]
+ */
+
+/**
+ * 「このページをコピー」した時点の1区切り分の記録
+ * @typedef {object} SyncSection
+ * @property {number} number コピー時点の開始ページ番号
+ * @property {number} endNumber コピー時点の終了ページ番号
+ * @property {string[]} texts コピー時点の各項目の本文（全角化前）
+ * @property {number} copiedAt コピーした時刻（ミリ秒）
+ */
+
+/**
+ * 1つの Cosense ページ（作品）に対する記録。キーは見出し行 ID（無ければ `n:<number>-<endNumber>`）
+ * @typedef {object} SyncRecord
+ * @property {1} version
+ * @property {Record<string, SyncSection>} sections
+ */
+
+/**
+ * SyncRecord の保存先。失敗しても例外を投げない
+ * @typedef {object} SyncStore
+ * @property {() => SyncRecord} load 読めなければ空の記録を返す
+ * @property {(record: SyncRecord) => boolean} save 保存できたら true
+ */
+
+/**
+ * @typedef {"new" | "changed" | "renumbered" | "synced"} PageSyncStatus
+ */
+
+/**
+ * 項目ごとの差分。`removed` は記録側にだけある本文で kind を持たない
+ * @typedef {object} DiffItem
+ * @property {"same" | "added" | "removed"} type
+ * @property {TextKind} [kind]
+ * @property {string} text
+ */
+
+/**
+ * @typedef {object} PageSync
+ * @property {PageSyncStatus} status
+ * @property {SyncSection} [previous] 記録があればその内容
+ * @property {DiffItem[]} items
  */
