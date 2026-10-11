@@ -1,7 +1,7 @@
-# dist/script.js を CI でビルドし、コミットごとにダウンロードできるようにする。
+# dist/script.js と dist/script.min.js を CI でビルドし、コミットごとにダウンロードできるようにする。
 # - すべての push / pull request: テスト → ビルド → Actions の artifact にアップロード
-# - main への push: さらに `build-<短縮SHA>` タグの Release を作り、script.js を添付する
-#   （最新版は https://github.com/<owner>/<repo>/releases/latest/download/script.js で取れる）
+# - main への push: さらに `build-<短縮SHA>` タグの Release を作り、両方を添付する
+#   （最新版は https://github.com/<owner>/<repo>/releases/latest/download/script.min.js などで取れる）
 name: build
 
 on:
@@ -33,7 +33,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: script-${{ steps.meta.outputs.short_sha }}
-          path: dist/script.js
+          path: |
+            dist/script.js
+            dist/script.min.js
           if-no-files-found: error
 
   release:
@@ -55,7 +57,7 @@ jobs:
           TITLE: ${{ github.event.head_commit.message }}
         run: |
           # タイトルはコミットメッセージの1行目、本文にコミットへのリンクを入れる
-          gh release create "$TAG" dist/script.js \
+          gh release create "$TAG" dist/script.js dist/script.min.js \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "${TITLE%%$'\n'*}" \

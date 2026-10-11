@@ -7,7 +7,7 @@
   "private": true,
   "scripts": {
     "test": "node --test",
-    "build": "esbuild src/index.js --bundle --format=iife --outfile=dist/script.js"
+    "build": "esbuild src/index.js --bundle --format=iife --outfile=dist/script.js && esbuild src/index.js --bundle --format=iife --minify --outfile=dist/script.min.js"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

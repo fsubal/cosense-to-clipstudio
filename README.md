@@ -65,11 +65,13 @@ Cosense 上で次のような構造でプロットを書きます。
    code:script.js
    ```
 
-3. `script.js` の中身をそのコードブロックの中へ貼り付ける。入手先は次のいずれか
-   - [Releases](../../releases) の最新版（`releases/latest/download/script.js` で直接ダウンロードできる）。
+3. `script.min.js` の中身をそのコードブロックの中へ貼り付ける。入手先は次のいずれか
+   - [Releases](../../releases) の最新版（`releases/latest/download/script.min.js` で直接ダウンロードできる）。
+     UserScript は Cosense のページに貼り付けるものなので、短い minify 版を使います。
+     内容を読みたいときは同じ Release の `script.js`（minify なし）を参照してください
      main へのコミットごとに `build-<短縮SHA>` という Release が自動で作られる
    - 任意のコミットやブランチのビルドは [Actions](../../actions) の各実行ページの artifact
-   - 手元でビルドする場合は `npm run build` で生成される `dist/script.js`（リポジトリには含めていません）
+   - 手元でビルドする場合は `npm run build` で生成される `dist/script.min.js`（リポジトリには含めていません）
 4. ブラウザをリロードする
 
 UserScript は自分にだけ有効です。プロジェクトの他のメンバーには影響しません。
@@ -98,12 +100,12 @@ UserScript は自分にだけ有効です。プロジェクトの他のメンバ
 ```sh
 npm install
 npm test        # パーサー・フォーマッターの単体テスト (node:test)
-npm run build   # src/ を dist/script.js にバンドル (esbuild)
+npm run build   # src/ を dist/script.js と minify 版 dist/script.min.js にバンドル (esbuild)
 ```
 
 - GitHub Actions（`.github/workflows/build.yml`）が push と pull request ごとに
-  `npm test` と `npm run build` を実行し、`dist/script.js` を artifact にアップロードします。
-  main への push ではコミットごとに Release を作成して `script.js` を添付します
+  `npm test` と `npm run build` を実行し、`dist/script.js` と `dist/script.min.js` を artifact にアップロードします。
+  main への push ではコミットごとに Release を作成して両方を添付します
 - TypeScript は使わず、jsconfig.json + JSDoc で型を付けています
   （`npx tsc -p jsconfig.json` で型チェックできます）
 - パーサーのコア (`src/parse.js`) は DOM や `window.cosense` に依存せず、
@@ -152,7 +154,7 @@ npm run build   # src/ を dist/script.js にバンドル (esbuild)
 
 ## 実機確認手順
 
-1. `npm run build` で生成した `dist/script.js` を [インストール](#インストール) の手順で自分のページに貼り付け、リロードする
+1. `npm run build` で生成した `dist/script.min.js` を [インストール](#インストール) の手順で自分のページに貼り付け、リロードする
 2. Cosense に新しいページを作り、[プロットの書き方](#プロットの書き方) の入力例をそのまま書く
 3. Page Menu に「CLIPSTUDIO用に出力」ボタンが表示されることを確認する
 4. クリックしてモーダルが開き、以下になることを確認する
@@ -190,7 +192,7 @@ npm run build   # src/ を dist/script.js にバンドル (esbuild)
 Cosenseの現在のプロットページを1作品として、全ページの中間表現（manifest）をJSONで出力します。
 Mac版CSPの起動・作品作成・テキスト投入を行う機能ではありません。
 
-1. Release または `npm run build` で得た最新の `script.js` をプロフィールのUserScriptに貼り替え、リロードします。
+1. Release または `npm run build` で得た最新の `script.min.js` をプロフィールのUserScriptに貼り替え、リロードします。
 2. プロットページの「CLIPSTUDIO用に出力」を開きます。
 3. 「Computer Use用JSONをコピー」で作品全体のJSONをコピーします。
    ファイルが必要なら「Computer Use用JSONを書き出す」で
