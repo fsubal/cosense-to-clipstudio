@@ -74,17 +74,15 @@ const CSS = `
 .ctcs-status[data-status="renumbered"] { color: #6a1b9a; border-color: #ce93d8; background: #f3e5f5; }
 .ctcs-status[data-status="synced"] { color: #1b5e20; border-color: #a5d6a7; background: #e8f5e9; }
 .ctcs-meta { font-size: 11px; color: #777; }
-.ctcs-warnings {
-  margin: 0 0 12px; padding: 8px 12px;
-  background: #fff3cd; border: 1px solid #ffe08a; border-radius: 4px;
-  color: #664d03; list-style: none;
+.ctcs-messages {
+  margin: 0 0 12px; padding: 6px 12px; border: 1px solid; border-radius: 4px; list-style: none;
 }
+.ctcs-messages summary { cursor: pointer; font-size: 12px; user-select: none; }
+.ctcs-messages[open] summary { margin-bottom: 4px; }
+.ctcs-messages ul { margin: 0; padding: 0; list-style: none; }
+.ctcs-warnings { background: #fff3cd; border-color: #ffe08a; color: #664d03; }
 .ctcs-warnings li::before { content: "⚠ "; }
-.ctcs-notes {
-  margin: 0 0 12px; padding: 8px 12px;
-  background: #e7f1ff; border: 1px solid #b6d4fe; border-radius: 4px;
-  color: #084298; list-style: none;
-}
+.ctcs-notes { background: #e7f1ff; border-color: #b6d4fe; color: #084298; }
 .ctcs-notes li::before { content: "ℹ "; }
 .ctcs-items { margin: 0; padding: 0; list-style: none; }
 .ctcs-items li {
@@ -188,6 +186,12 @@ export class ClipStudioExportModal extends HTMLElement {
   #record = emptyRecord();
   /** コピーの記録を保存できなかった（追跡が次回に引き継がれない） */
   #saveFailed = false;
+  /**
+   * 警告・情報の折りたたみ状態。ページを移動しても保持する。
+   * 全体の警告はどのページでも同じものが出るので初期状態では閉じておく
+   * @type {Record<MessageGroup, boolean>}
+   */
+  #openGroups = { global: false, page: true, notes: true };
 
   #index = 0;
   #dialog = el("div", "ctcs-dialog");
@@ -279,7 +283,7 @@ export class ClipStudioExportModal extends HTMLElement {
       empty.textContent =
         "ページ見出し（インデント0の「1.」「2.」…）が見つかりませんでした";
       body.appendChild(empty);
-      appendWarnings(body, result.warnings);
+      this.#appendMessages(body, "global", result.warnings);
       return;
     }
 
@@ -297,9 +301,12 @@ export class ClipStudioExportModal extends HTMLElement {
   #renderSummary(body) {
     if (!this.#syncStore) return;
     if (this.#saveFailed) {
-      appendWarnings(body, [
-        "コピーの記録を保存できませんでした。変更の追跡は次回に引き継がれません",
-      ]);
+      const list = el("ul", "ctcs-messages ctcs-warnings");
+      const li = el("li");
+      li.textContent =
+        "コピーの記録を保存できませんでした。変更の追跡は次回に引き継がれません";
+      list.appendChild(li);
+      body.appendChild(list);
     }
 
     const summary = summarize(this.#record, this.#result.pages);
@@ -443,8 +450,9 @@ export class ClipStudioExportModal extends HTMLElement {
    * @param {import("./types.js").PlotPage} page 
    */
   #renderPageContent(body, result, page) {
-    appendWarnings(body, [...result.warnings, ...page.warnings]);
-    appendNotes(body, page.notes);
+    this.#appendMessages(body, "global", result.warnings);
+    this.#appendMessages(body, "page", page.warnings);
+    this.#appendMessages(body, "notes", page.notes);
 
     // 追跡中は前回コピー時点との差分（削除された項目も含む）を表示する
     /** @type {import("./types.js").DiffItem[]} */
@@ -459,6 +467,21 @@ export class ClipStudioExportModal extends HTMLElement {
     } else {
       this.#renderItemsList(body, items);
     }
+  }
+
+  /**
+   * 警告・情報を折りたたみ可能な一覧として追加する。開閉状態は再描画後も引き継ぐ
+   * @param {HTMLElement} parent
+   * @param {MessageGroup} group
+   * @param {string[]} messages
+   */
+  #appendMessages(parent, group, messages) {
+    if (messages.length === 0) return;
+    const details = createMessages(group, messages, this.#openGroups[group]);
+    details.addEventListener("toggle", () => {
+      this.#openGroups[group] = details.open;
+    });
+    parent.appendChild(details);
   }
 
   /**
@@ -599,37 +622,37 @@ async function copyText(text) {
   }
 }
 
-/**
- * @param {HTMLElement} parent
- * @param {string[]} warnings
- */
-function appendWarnings(parent, warnings) {
-  appendMessages(parent, "ctcs-warnings", warnings);
-}
+/** @typedef {"global" | "page" | "notes"} MessageGroup */
+
+/** @type {Record<MessageGroup, { title: string, className: string }>} */
+const MESSAGE_GROUPS = {
+  global: { title: "全体の警告", className: "ctcs-warnings" },
+  page: { title: "このページの警告", className: "ctcs-warnings" },
+  notes: { title: "情報", className: "ctcs-notes" },
+};
 
 /**
- * 警告ではないが確認の目安になる情報（部分抽出した行など）
- * @param {HTMLElement} parent
- * @param {string[]} notes
- */
-function appendNotes(parent, notes) {
-  appendMessages(parent, "ctcs-notes", notes);
-}
-
-/**
- * @param {HTMLElement} parent
- * @param {string} className
+ * 折りたたみ可能なメッセージ一覧。開閉は toggle イベントで呼び出し側に知らせる
+ * @param {MessageGroup} group
  * @param {string[]} messages
+ * @param {boolean} open
+ * @returns {HTMLDetailsElement}
  */
-function appendMessages(parent, className, messages) {
-  if (messages.length === 0) return;
-  const list = el("ul", className);
+function createMessages(group, messages, open) {
+  const { title, className } = MESSAGE_GROUPS[group];
+  const details = el("details", `ctcs-messages ${className}`);
+  details.open = open;
+  const summary = el("summary");
+  summary.textContent = `${title}（${messages.length}件）`;
+  details.appendChild(summary);
+  const list = el("ul");
   for (const message of messages) {
     const li = el("li");
     li.textContent = message;
     list.appendChild(li);
   }
-  parent.appendChild(list);
+  details.appendChild(list);
+  return details;
 }
 
 /**
