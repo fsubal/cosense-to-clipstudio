@@ -59,32 +59,44 @@ Cosense 上で次のような構造でプロットを書きます。
 ## インストール
 
 1. Cosense の右上メニュー → `Edit Profile` → `UserScript` を Enabled にする
-2. 自分のプロフィールページ（`/プロジェクト名/自分のユーザー名`）に以下のコードブロックを作る
+2. 自分のプロジェクトにビルドを置く専用のページ（例: `cosense-to-clipstudio`）を作り、
+   以下のコードブロックを書く
 
    ```
-   code:script.js
+   code:script.min.js
    ```
 
-3. そのコードブロックに、GitHub Pages で配信している最新版を読み込む1行を書く
+3. `script.min.js` の中身をそのコードブロックの中へ貼り付ける。入手先は次のいずれか
+   - GitHub Pages の最新版 https://fsubal.github.io/cosense-to-clipstudio/script.min.js
+     （main へのコミットごとに更新される）。Mac なら次の1行でクリップボードに入る
 
-   ```
-   code:script.js
-    import "https://fsubal.github.io/cosense-to-clipstudio/script.min.js";
-   ```
+     ```sh
+     curl -s https://fsubal.github.io/cosense-to-clipstudio/script.min.js | pbcopy
+     ```
 
-   Cosense の UserScript は ES モジュールとして読み込まれるので `import` が使えます。
-   main へのコミットごとに Pages の内容が更新されるため、以後は貼り替えなしで最新版になります
-   （Pages のキャッシュの都合で反映まで最大10分ほどかかります）。
-   特定のバージョンに固定したい場合や外部読み込みを避けたい場合は、代わりに `script.min.js` の
-   中身をそのまま貼り付けてください。入手先は次のいずれか
-   - [Releases](../../releases) の最新版（`releases/latest/download/script.min.js` で直接ダウンロードできる）。
-     main へのコミットごとに `build-<短縮SHA>` という Release が自動で作られる。
+   - [Releases](../../releases) の `build-<短縮SHA>`（特定のコミットに固定したいとき。
+     `releases/latest/download/script.min.js` で最新版を直接ダウンロードできる）。
      内容を読みたいときは同じ Release の `script.js`（minify なし）を参照してください
    - 任意のコミットやブランチのビルドは [Actions](../../actions) の各実行ページの artifact
    - 手元でビルドする場合は `npm run build` で生成される `dist/script.min.js`（リポジトリには含めていません）
-4. ブラウザをリロードする
+4. 自分のプロフィールページ（`/プロジェクト名/自分のユーザー名`）に、手順2のページを読み込む
+   UserScript を書く。`<project>` と `<page>` は手順2のプロジェクト名とページ名
+
+   ```
+   code:script.js
+    import "/api/code/<project>/<page>/script.min.js";
+   ```
+
+5. ブラウザをリロードする
 
 UserScript は自分にだけ有効です。プロジェクトの他のメンバーには影響しません。
+更新するときは手順3を繰り返してリロードするだけで、プロフィールの UserScript は変えません。
+
+> **なぜ GitHub Pages を直接 `import` しないのか**
+> Cosense の Content-Security-Policy は `script-src` も `connect-src` も `'self'`（scrapbox.io）と
+> ごく一部のドメインしか許可していないため、外部サイトのスクリプトは `import` も `fetch` も
+> ブロックされます。Cosense が自分自身から配信する `/api/code/...` だけが読み込めるので、
+> ビルドは Cosense のページに置き、GitHub Pages はその入手元として使います。
 
 ## 使い方
 
@@ -117,6 +129,7 @@ npm run build   # src/ を dist/script.js と minify 版 dist/script.min.js に�
   `npm test` と `npm run build` を実行し、`dist/script.js` と `dist/script.min.js` を artifact にアップロードします。
   main への push ではコミットごとに Release を作成して両方を添付し、`dist/` を
   GitHub Pages（https://fsubal.github.io/cosense-to-clipstudio/）にも配信します。
+  Pages は最新版を `curl` で取るための入手元で、Cosense の CSP の制約から直接 `import` はできません。
   Pages のデプロイにはリポジトリの Settings → Pages で Source を「GitHub Actions」にしておく必要があります
 - TypeScript は使わず、jsconfig.json + JSDoc で型を付けています
   （`npx tsc -p jsconfig.json` で型チェックできます）
@@ -169,7 +182,7 @@ npm run build   # src/ を dist/script.js と minify 版 dist/script.min.js に�
 
 ## 実機確認手順
 
-1. `npm run build` で生成した `dist/script.min.js` を [インストール](#インストール) の手順で自分のページに貼り付け、リロードする
+1. `npm run build` で生成した `dist/script.min.js` を [インストール](#インストール) 手順2のコードページに貼り付け、リロードする
 2. Cosense に新しいページを作り、[プロットの書き方](#プロットの書き方) の入力例をそのまま書く
 3. Page Menu に「CLIPSTUDIO用に出力」ボタンが表示されることを確認する
 4. クリックしてモーダルが開き、以下になることを確認する
@@ -207,7 +220,7 @@ npm run build   # src/ を dist/script.js と minify 版 dist/script.min.js に�
 Cosenseの現在のプロットページを1作品として、全ページの中間表現（manifest）をJSONで出力します。
 Mac版CSPの起動・作品作成・テキスト投入を行う機能ではありません。
 
-1. UserScript が Pages 版を `import` していればリロードするだけで最新になります。貼り付け運用の場合は Release または `npm run build` で得た最新の `script.min.js` に貼り替えてリロードします。
+1. 最新の `script.min.js`（GitHub Pages、Release、または `npm run build`）を [インストール](#インストール) 手順2のコードページに貼り替えてリロードします。
 2. プロットページの「CLIPSTUDIO用に出力」を開きます。
 3. 「Computer Use用JSONをコピー」で作品全体のJSONをコピーします。
    ファイルが必要なら「Computer Use用JSONを書き出す」で

@@ -2,9 +2,10 @@
 # - すべての push / pull request: テスト → ビルド → Actions の artifact にアップロード
 # - main への push: さらに `build-<短縮SHA>` タグの Release を作り、両方を添付する
 #   （最新版は https://github.com/<owner>/<repo>/releases/latest/download/script.min.js などで取れる）
-# - main への push: GitHub Pages に dist/ を配信する。Cosense の UserScript から
-#   https://<owner>.github.io/<repo>/script.min.js を import すれば貼り替え作業が不要になる
-#   （リポジトリの Settings → Pages で Source を "GitHub Actions" にしておく必要がある）
+# - main への push: GitHub Pages に dist/ を配信する。最新版を
+#   https://<owner>.github.io/<repo>/script.min.js から curl で取って Cosense に貼り付ける用
+#   （Cosense の CSP の制約で UserScript から直接 import はできない。
+#   リポジトリの Settings → Pages で Source を "GitHub Actions" にしておく必要がある）
 name: build
 
 on:
@@ -95,7 +96,7 @@ jobs:
           <h1>cosense-to-clipstudio</h1>
           <p>Built from <a href="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}">${GITHUB_SHA::7}</a></p>
           <ul>
-            <li><a href="script.min.js">script.min.js</a>（Cosense の UserScript から import する用）</li>
+            <li><a href="script.min.js">script.min.js</a>（Cosense のコードページに貼り付ける用）</li>
             <li><a href="script.js">script.js</a>（minify なし）</li>
           </ul>
           EOF
