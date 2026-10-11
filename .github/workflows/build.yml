@@ -2,6 +2,9 @@
 # - すべての push / pull request: テスト → ビルド → Actions の artifact にアップロード
 # - main への push: さらに `build-<短縮SHA>` タグの Release を作り、両方を添付する
 #   （最新版は https://github.com/<owner>/<repo>/releases/latest/download/script.min.js などで取れる）
+# - main への push: GitHub Pages に dist/ を配信する。Cosense の UserScript から
+#   https://<owner>.github.io/<repo>/script.min.js を import すれば貼り替え作業が不要になる
+#   （リポジトリの Settings → Pages で Source を "GitHub Actions" にしておく必要がある）
 name: build
 
 on:
@@ -62,3 +65,44 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "${TITLE%%$'\n'*}" \
             --notes "Built from ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
+
+  pages:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    concurrency:
+      group: github-pages
+      cancel-in-progress: true
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: script-${{ needs.build.outputs.short_sha }}
+          path: dist
+
+      - name: Write index.html
+        run: |
+          # どのコミットのビルドが配信されているか分かるようにする
+          cat > dist/index.html <<EOF
+          <!doctype html>
+          <meta charset="utf-8">
+          <title>cosense-to-clipstudio</title>
+          <h1>cosense-to-clipstudio</h1>
+          <p>Built from <a href="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}">${GITHUB_SHA::7}</a></p>
+          <ul>
+            <li><a href="script.min.js">script.min.js</a>（Cosense の UserScript から import する用）</li>
+            <li><a href="script.js">script.js</a>（minify なし）</li>
+          </ul>
+          EOF
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deploy
+        uses: actions/deploy-pages@v4
