@@ -141,6 +141,9 @@ npm run build   # src/ を dist/script.js と minify 版 dist/script.min.js に�
   `<style>` に入れています。Cosense のグローバル CSS（`button` や `ul` などの要素セレクタ）が
   モーダルに当たらず、逆にモーダルの CSS が Cosense 側に漏れません。
   `:host { all: initial }` でフォントや色の継承も遮断し、必要なものは `.ctcs-dialog` で明示しています
+- ダイアログの高さはページの内容量によらず固定（`min(720px, 100vh - 64px)`）で、本文だけをスクロールさせています。
+  ページごとに高さが変わると「次ページ →」を連打したときにボタンが動き、backdrop を誤クリックして
+  閉じてしまうためです
 - CSP への反映状態は、「このページをコピー」した時点の各項目の本文（全角化前）を
   `cosense-to-clipstudio:sync:<プロジェクト名>/<ページID>` キーで localStorage に記録し、
   次に開いたときの本文と最長共通部分列で比べています。区切りは見出し行の Cosense 行 ID で追跡するので、

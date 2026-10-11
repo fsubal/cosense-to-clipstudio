@@ -30,7 +30,9 @@ const CSS = `
 .ctcs-dialog {
   background: #fff; color: #222;
   width: min(560px, calc(100vw - 32px));
-  max-height: calc(100vh - 64px);
+  /* 高さはページの内容量に関係なく固定する。「次ページ」を連打しても
+     フッターのボタンが動かず、backdrop を誤クリックして閉じるのを防ぐ */
+  height: min(720px, calc(100vh - 64px));
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   display: flex; flex-direction: column;
@@ -48,7 +50,7 @@ const CSS = `
   border: none; background: none; font-size: 20px; cursor: pointer;
   color: #666; padding: 0 4px;
 }
-.ctcs-body { padding: 16px; overflow-y: auto; }
+.ctcs-body { padding: 16px; overflow-y: auto; flex: 1; min-height: 0; }
 .ctcs-summary {
   margin: 0 0 12px; padding: 8px 12px; border-radius: 4px; font-size: 13px;
   background: #f3f4f6; border: 1px solid #ddd; color: #333;
