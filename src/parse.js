@@ -167,8 +167,9 @@ function pageNumbers(page) {
 
 /**
  * 1行を括弧ごとのテキスト項目に分解する。
- * 括弧で囲まれた部分が無い行や、括弧の後ろに地の文が続く行はト書きとして空配列を返す。
- * 最初の括弧より前の地の文（書き文字・話者名）は出力せず、除外したことを notes で知らせる
+ * 括弧で囲まれた部分が無い行はト書きとして空配列を返す。
+ * 括弧の外の地の文（書き文字・話者名。括弧の前・間・後ろのどこにあっても）は出力せず、
+ * 除外したことを notes で知らせる
  *
  * @param {string} text
  * @param {number} sourceLine
@@ -183,9 +184,9 @@ function classify(text, sourceLine) {
   const items = split.segments.map(({ kind, text }) => ({ kind, text, sourceLine }));
   /** @type {string[]} */
   const notes = [];
-  const prefix = split.prefix.trim();
-  if (prefix !== "") {
-    notes.push(`括弧の前の「${prefix}」を除外しました: ${text}`);
+  if (split.outside.length > 0) {
+    const quoted = split.outside.map((part) => `「${part}」`).join("");
+    notes.push(`括弧の外の${quoted}を除外しました: ${text}`);
   }
   if (items.length > 1) {
     notes.push(`1行を${items.length}項目に分割しました: ${text}`);
@@ -194,26 +195,33 @@ function classify(text, sourceLine) {
 }
 
 /**
- * 行を「最上位で閉じた括弧の並び」と「最初の括弧より前の地の文」に分ける。
+ * 行を「最上位で閉じた括弧の並び」と「括弧の外の地の文」に分ける。
  * 括弧の内側の括弧は本文の一部として残す。
+ * 括弧の外の地の文は前・間・後ろのどこにあっても outside に集める
+ * （`「いつも読んでますー」すごいファンで` のように書き文字が吹き出しの後ろに来ることがある）。
  *
  * 次の場合は括弧の並びとして解釈できないので null を返す（行全体がト書き）
  * - 括弧の対応が取れない（閉じ忘れ・種類の不一致・深さ0での閉じ括弧）
  * - 括弧で囲まれた部分が1つも無い
- * - 括弧の間や後ろに空白以外の地の文がある
  *
  * @param {string} text
- * @returns {{ prefix: string, segments: { kind: import("./types.js").TextKind, text: string }[] } | null}
+ * @returns {{ outside: string[], segments: { kind: import("./types.js").TextKind, text: string }[] } | null}
  */
 function splitSegments(text) {
   const chars = Array.from(text);
   /** @type {{ kind: import("./types.js").TextKind, text: string }[]} */
   const segments = [];
+  /** @type {string[]} */
+  const outside = [];
   /** @type {(typeof BRACKETS)[number][]} */
   const stack = [];
-  let prefix = "";
-  let trailing = "";
+  let plain = "";
   let segmentStart = 0;
+
+  const flushPlain = () => {
+    if (plain.trim() !== "") outside.push(plain.trim());
+    plain = "";
+  };
 
   for (let i = 0; i < chars.length; i += 1) {
     const char = chars[i];
@@ -222,15 +230,13 @@ function splitSegments(text) {
 
     if (stack.length === 0) {
       if (opener) {
-        if (trailing.trim() !== "") return null;
+        flushPlain();
         stack.push(opener);
         segmentStart = i + 1;
       } else if (closer) {
         return null;
-      } else if (segments.length === 0) {
-        prefix += char;
       } else {
-        trailing += char;
+        plain += char;
       }
       continue;
     }
@@ -242,13 +248,13 @@ function splitSegments(text) {
       stack.pop();
       if (stack.length === 0) {
         segments.push({ kind: closer.kind, text: chars.slice(segmentStart, i).join("") });
-        trailing = "";
       }
     }
   }
+  flushPlain();
 
-  if (stack.length > 0 || segments.length === 0 || trailing.trim() !== "") {
+  if (stack.length > 0 || segments.length === 0) {
     return null;
   }
-  return { prefix, segments };
+  return { outside, segments };
 }

@@ -65,9 +65,9 @@ test("括弧で囲まれていないト書きは出力しない", () => {
   const { pages, warnings } = parsePlot([
     { text: "1.", indent: 0 },
     { text: "主人公が歩いている", indent: 1 },
-    { text: "「セリフ」のあとにト書きが続く行", indent: 1 },
+    { text: "（半角の）括弧は[対象外]", indent: 1 },
   ]);
-  assert.deepEqual(pages[0].items, []);
+  assert.deepEqual(pages[0].items.map((item) => item.text), ["半角の"]);
   assert.deepEqual(warnings, []);
 });
 
@@ -298,8 +298,8 @@ test("最初の括弧より前の書き文字は出力せず情報として知�
     { kind: "monologue", text: "キレーな人…" },
   ]);
   assert.deepEqual(pages[0].notes, [
-    "括弧の前の「あ」を除外しました: あ「はい」",
-    "括弧の前の「わー」を除外しました: わー（キレーな人…）",
+    "括弧の外の「あ」を除外しました: あ「はい」",
+    "括弧の外の「わー」を除外しました: わー（キレーな人…）",
   ]);
 });
 
@@ -313,7 +313,7 @@ test("話者名の前置きも括弧の中だけを出力する", () => {
     { kind: "dialogue", text: "はい" },
     { kind: "dialogue", text: "はい" },
   ]);
-  assert.match(pages[0].notes[1], /^括弧の前の「主人公」を除外しました/);
+  assert.match(pages[0].notes[1], /^括弧の外の「主人公」を除外しました/);
 });
 
 test("括弧の内側の括弧は本文の一部として残る", () => {
@@ -343,14 +343,25 @@ test("種別の違う括弧が並んだ行も順に別項目になる", () => {
   ]);
 });
 
-test("括弧の後ろや間に地の文が続く行はト書きになる", () => {
+test("括弧の後ろや間の書き文字も出力せず情報として知らせる", () => {
   const { pages } = parsePlot([
     { text: "1.", indent: 0 },
+    { text: "「いつも読んでますー」すごいファンで", indent: 1 },
     { text: "主人公が「はい」と言う", indent: 1 },
-    { text: "「はい」と「いいえ」", indent: 1 },
+    { text: "「はい」と「いいえ」 ", indent: 1 },
   ]);
-  assert.deepEqual(pages[0].items, []);
-  assert.deepEqual(pages[0].notes, []);
+  assert.deepEqual(kindsAndTexts(pages[0]), [
+    { kind: "dialogue", text: "いつも読んでますー" },
+    { kind: "dialogue", text: "はい" },
+    { kind: "dialogue", text: "はい" },
+    { kind: "dialogue", text: "いいえ" },
+  ]);
+  assert.deepEqual(pages[0].notes, [
+    "括弧の外の「すごいファンで」を除外しました: 「いつも読んでますー」すごいファンで",
+    "括弧の外の「主人公が」「と言う」を除外しました: 主人公が「はい」と言う",
+    "括弧の外の「と」を除外しました: 「はい」と「いいえ」",
+    "1行を2項目に分割しました: 「はい」と「いいえ」",
+  ]);
 });
 
 test("括弧の対応が取れない行はト書きになる", () => {

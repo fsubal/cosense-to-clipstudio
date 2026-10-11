@@ -87,7 +87,7 @@ test("分割・除外の情報をJSONへ保持する", () => {
   ]));
   assert.deepEqual(manifest.pages[0].items.map((item) => item.text), ["はい", "いいえ"]);
   assert.deepEqual(manifest.pages[0].notes, [
-    "括弧の前の「あ」を除外しました: あ「はい」「いいえ」",
+    "括弧の外の「あ」を除外しました: あ「はい」「いいえ」",
     "1行を2項目に分割しました: あ「はい」「いいえ」",
   ]);
   assert.deepEqual(manifest.pages[0].warnings, []);
