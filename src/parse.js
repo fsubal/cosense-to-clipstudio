@@ -12,6 +12,12 @@ const PAGE_HEADING_PATTERN = /^(\d+)(?:-(\d+))?\.(?:\s+(.*))?$/;
 /** `[fsubal.icon]` のようなプロフィールアイコンから始まる行は作者コメント */
 const AUTHOR_COMMENT_PATTERN = /^\[[^[\]]+\.icon\]/;
 
+/**
+ * Cosense の引用記法。行頭（インデントの後）の `>` に続く部分を本文とする。
+ * 漫画の中に出てくる記事やツイートなどの文章をト書き内に書くのに使う
+ */
+const QUOTE_PATTERN = /^>\s?(.*)$/;
+
 /** `[- 取り消し線]` の記法（`[-* ...]` などの複合装飾も含む）は無かったものとして扱う */
 const STRIKETHROUGH_PATTERN = /\[-[^\]]*\]/g;
 
@@ -40,10 +46,18 @@ export function parsePlot(lines) {
   /** @type {Set<number>} */
   const seenNumbers = new Set();
   let expectedNumber = 1;
+  /**
+   * 直前の行が引用だったときの、その引用項目。連続する引用行は1項目にまとめる
+   * @type {import("./types.js").PlotItem | null}
+   */
+  let openQuote = null;
 
   lines.forEach((line, index) => {
     const sourceLine = line.sourceLine ?? index;
     const text = line.text.replace(STRIKETHROUGH_PATTERN, "").trim();
+    const quote = text.match(QUOTE_PATTERN);
+    const previousQuote = openQuote;
+    openQuote = null;
 
     const heading = line.indent === 0 ? text.match(PAGE_HEADING_PATTERN) : null;
     if (heading) {
@@ -86,6 +100,23 @@ export function parsePlot(lines) {
     if (!currentPage) {
       // ページ見出しより前の行。ト書きであっても構造の崩れなので知らせる
       warnings.push(`ページ見出しより前の行を無視しました: ${text}`);
+      return;
+    }
+
+    if (quote) {
+      // 引用は中の括弧で分解せず、行全体を1つの本文として扱う。
+      // 中身が空の `>` だけの行は引用の区切りとして扱い、何も出力しない
+      const body = quote[1].trim();
+      if (body === "") return;
+      if (previousQuote) {
+        previousQuote.text += `\n${body}`;
+        openQuote = previousQuote;
+        return;
+      }
+      /** @type {import("./types.js").PlotItem} */
+      const item = { kind: "quote", text: body, sourceLine };
+      currentPage.items.push(item);
+      openQuote = item;
       return;
     }
 

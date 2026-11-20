@@ -13,6 +13,7 @@ const KIND_LABELS = {
   dialogue: "セリフ",
   narration: "ナレーション",
   monologue: "モノローグ",
+  quote: "作中テキスト",
 };
 
 /**
@@ -98,6 +99,7 @@ const CSS = `
 .ctcs-kind[data-kind="dialogue"] { background: #1976d2; }
 .ctcs-kind[data-kind="narration"] { background: #455a64; }
 .ctcs-kind[data-kind="monologue"] { background: #8e24aa; }
+.ctcs-kind[data-kind="quote"] { background: #ef6c00; }
 .ctcs-text { white-space: pre-wrap; }
 .ctcs-diff-mark { flex-shrink: 0; width: 1.2em; text-align: center; font-size: 12px; font-weight: bold; }
 .ctcs-items li[data-diff="removed"] { color: #999; background: #fafafa; }
@@ -108,6 +110,9 @@ const CSS = `
 .ctcs-items li[data-kind="monologue"] .ctcs-text {
   font-family: "Hiragino Maru Gothic ProN", "Yu Gothic", sans-serif;
   color: #6a1b9a;
+}
+.ctcs-items li[data-kind="quote"] .ctcs-text {
+  border-left: 3px solid #ffb74d; padding-left: 8px; color: #555;
 }
 .ctcs-empty { color: #888; }
 .ctcs-footer {

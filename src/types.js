@@ -1,5 +1,7 @@
 /**
- * @typedef {"dialogue" | "narration" | "monologue"} TextKind
+ * テキスト項目の種別。dialogue（「」セリフ）/ narration（［］ナレーション）/
+ * monologue（（）モノローグ）/ quote（`>` 引用で書く作中テキスト。作中の記事やツイートなどの文章）
+ * @typedef {"dialogue" | "narration" | "monologue" | "quote"} TextKind
  */
 
 /**
@@ -7,8 +9,8 @@
  *
  * @typedef {object} PlotItem
  * @property {TextKind} kind
- * @property {string} text 括弧を外したあとの本文
- * @property {number} sourceLine 元ページでの行番号（タイトル行を 0 とする 0 始まり）
+ * @property {string} text 括弧を外したあとの本文。引用は `>` を外した本文で、連続する引用行は改行でつなぐ
+ * @property {number} sourceLine 元ページでの行番号（タイトル行を 0 とする 0 始まり）。連続する引用は先頭行
  */
 
 /**
