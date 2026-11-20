@@ -417,3 +417,56 @@ test("ID や更新時刻が無い入力では headingId / updated を持たな�
   assert.equal("headingId" in pages[0], false);
   assert.equal("updated" in pages[0], false);
 });
+
+test("引用行は中の括弧で分解せず行全体を作中テキストとして出力する", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "> 速報「新譜」が［発売］（予定）", indent: 1 },
+    { text: "「えっ」", indent: 1 },
+  ]);
+  assert.deepEqual(kindsAndTexts(pages[0]), [
+    { kind: "quote", text: "速報「新譜」が［発売］（予定）" },
+    { kind: "dialogue", text: "えっ" },
+  ]);
+  assert.deepEqual(pages[0].notes, []);
+});
+
+test("連続する引用行は改行でつないで1項目にする", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "> 今日のライブ最高だった", indent: 1, sourceLine: 5 },
+    { text: ">ありがとう！", indent: 1, sourceLine: 6 },
+    { text: ">", indent: 1, sourceLine: 7 },
+    { text: "> 別のツイート", indent: 1, sourceLine: 8 },
+    { text: "", indent: 1, sourceLine: 9 },
+    { text: "> 空行のあとの記事", indent: 1, sourceLine: 10 },
+    { text: "ト書き", indent: 1, sourceLine: 11 },
+    { text: "> さらに別の記事", indent: 2, sourceLine: 12 },
+  ]);
+  assert.deepEqual(pages[0].items, [
+    { kind: "quote", text: "今日のライブ最高だった\nありがとう！", sourceLine: 5 },
+    { kind: "quote", text: "別のツイート", sourceLine: 8 },
+    { kind: "quote", text: "空行のあとの記事", sourceLine: 10 },
+    { kind: "quote", text: "さらに別の記事", sourceLine: 12 },
+  ]);
+});
+
+test("引用はページ見出しをまたいでまとめない", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "> 前のページ", indent: 1 },
+    { text: "2.", indent: 0 },
+    { text: "> 次のページ", indent: 1 },
+  ]);
+  assert.deepEqual(kindsAndTexts(pages[0]), [{ kind: "quote", text: "前のページ" }]);
+  assert.deepEqual(kindsAndTexts(pages[1]), [{ kind: "quote", text: "次のページ" }]);
+});
+
+test("取り消し線の引用は出力しない", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "> [- ボツにした記事]", indent: 1 },
+    { text: "> 残す記事[- の一部]", indent: 1 },
+  ]);
+  assert.deepEqual(kindsAndTexts(pages[0]), [{ kind: "quote", text: "残す記事" }]);
+});
