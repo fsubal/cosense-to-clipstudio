@@ -19,14 +19,14 @@ const AUTHOR_COMMENT_PATTERN = /^\[[^[\]]+\.icon\]/;
 const QUOTE_PATTERN = /^>\s?(.*)$/;
 
 /**
- * Cosense のコードブロックの開始行。インデント N の `code:` 行から、
+ * Cosense のコードブロック・表の開始行。インデント N の `code:` / `table:` 行から、
  * N より深くインデントされた行が続く間がブロックの中身になる
- * （progfay/scrapbox-parser の `/^\s*code:/` と `row.indent > firstRow.indent` に合わせる。
+ * （progfay/scrapbox-parser の `/^\s*code:/` `/^\s*table:/` と `row.indent > firstRow.indent` に合わせる。
  * 完全な空行はインデント 0 なので必ずブロックを終わらせる）
  * 
  * @see https://github.com/progfay/scrapbox-parser/blob/7c1b0465b36723f316c8896e8ad0fad5b5478da9/src/block/Pack.ts#L19
  */
-const CODE_BLOCK_PATTERN = /^code:/;
+const BLOCK_PATTERN = /^(?:code|table):/;
 
 /** `[- 取り消し線]` の記法（`[-* ...]` などの複合装飾も含む）は無かったものとして扱う */
 const STRIKETHROUGH_PATTERN = /\[-[^\]]*\]/g;
@@ -62,10 +62,10 @@ export function parsePlot(lines) {
    */
   let openQuote = null;
   /**
-   * コードブロックの中にいるときの `code:` 行のインデント。外にいれば null
+   * コードブロック・表の中にいるときの `code:` / `table:` 行のインデント。外にいれば null
    * @type {number | null}
    */
-  let codeBlockIndent = null;
+  let blockIndent = null;
 
   lines.forEach((line, index) => {
     const sourceLine = line.sourceLine ?? index;
@@ -74,15 +74,15 @@ export function parsePlot(lines) {
     const previousQuote = openQuote;
     openQuote = null;
 
-    // コードブロックの `code:` 行と中身は、括弧や `>` を含んでいても出力しない。
+    // コードブロック・表の開始行と中身は、括弧や `>` を含んでいても出力しない。
     // 見出しより前にあっても警告しない（ページ見出しはインデント0なのでブロックの中には入らない）
-    if (codeBlockIndent !== null && line.indent > codeBlockIndent) {
+    if (blockIndent !== null && line.indent > blockIndent) {
       if (currentPage) touch(currentPage, line.updated);
       return;
     }
-    codeBlockIndent = null;
-    if (CODE_BLOCK_PATTERN.test(line.text)) {
-      codeBlockIndent = line.indent;
+    blockIndent = null;
+    if (BLOCK_PATTERN.test(line.text)) {
+      blockIndent = line.indent;
       if (currentPage) touch(currentPage, line.updated);
       return;
     }

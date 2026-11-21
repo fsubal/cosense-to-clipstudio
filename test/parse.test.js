@@ -522,3 +522,14 @@ test("コードブロックの行も区切りの更新時刻に含める", () =>
   ]);
   assert.equal(pages[0].updated, 300);
 });
+
+test("表の中身も括弧を含んでいても出力しない", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "table:登場人物", indent: 1 },
+    { text: "名前\t口癖", indent: 2 },
+    { text: "主人公\t「やばいよね」", indent: 2 },
+    { text: "「表の後のセリフ」", indent: 1 },
+  ]);
+  assert.deepEqual(kindsAndTexts(pages[0]), [{ kind: "dialogue", text: "表の後のセリフ" }]);
+});
