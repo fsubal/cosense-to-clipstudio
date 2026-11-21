@@ -470,3 +470,55 @@ test("取り消し線の引用は出力しない", () => {
   ]);
   assert.deepEqual(kindsAndTexts(pages[0]), [{ kind: "quote", text: "残す記事" }]);
 });
+
+test("コードブロックの中身は括弧や引用を含んでいても出力しない", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "code:plaintext", indent: 1 },
+    { text: "「コード内のセリフ」", indent: 2 },
+    { text: "［コード内のナレーション］", indent: 2 },
+    { text: "> コード内の引用", indent: 3 },
+    { text: "code:nested.js", indent: 3 },
+    { text: "（さらに深い行）", indent: 4 },
+    { text: "「ブロックの後のセリフ」", indent: 1 },
+  ]);
+  assert.deepEqual(kindsAndTexts(pages[0]), [{ kind: "dialogue", text: "ブロックの後のセリフ" }]);
+  assert.deepEqual(pages[0].notes, []);
+});
+
+test("コードブロックは code: 行以下のインデントか空行で終わり、空白だけの行では終わらない", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0 },
+    { text: "code:", indent: 0 },
+    { text: "", indent: 2 },
+    { text: "「空白だけの行の後もコード」", indent: 1 },
+    { text: "", indent: 0 },
+    { text: "「空行の後はセリフ」", indent: 1 },
+    { text: "code:a.txt", indent: 2 },
+    { text: "「浅い行はセリフ」", indent: 1 },
+  ]);
+  assert.deepEqual(kindsAndTexts(pages[0]), [
+    { kind: "dialogue", text: "空行の後はセリフ" },
+    { kind: "dialogue", text: "浅い行はセリフ" },
+  ]);
+});
+
+test("見出しより前のコードブロックは警告しない", () => {
+  const { pages, warnings } = parsePlot([
+    { text: "code:memo.txt", indent: 0 },
+    { text: "「メモ」", indent: 1 },
+    { text: "1.", indent: 0 },
+    { text: "「はい」", indent: 1 },
+  ]);
+  assert.deepEqual(warnings, []);
+  assert.deepEqual(kindsAndTexts(pages[0]), [{ kind: "dialogue", text: "はい" }]);
+});
+
+test("コードブロックの行も区切りの更新時刻に含める", () => {
+  const { pages } = parsePlot([
+    { text: "1.", indent: 0, updated: 100 },
+    { text: "code:a.txt", indent: 1, updated: 200 },
+    { text: "「中身」", indent: 2, updated: 300 },
+  ]);
+  assert.equal(pages[0].updated, 300);
+});
